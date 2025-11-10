@@ -14,7 +14,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest   
+    runs-on: ubuntu-latest  
 
     steps:
       - name: Checkout repository
@@ -25,9 +25,8 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-   
       - name: Restore test project
         run: dotnet restore Wijkagent.TestCore/Wijkagent.TestCore.csproj
 
       - name: Run unit tests
-        run: dotnet test Wijkagent.TestCore/Wijkagent.TestCore.csproj --configuration Release --no-build
+        run: dotnet test Wijkagent.TestCore/Wijkagent.TestCore.csproj --configuration Release
