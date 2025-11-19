@@ -20,7 +20,7 @@ jobs:
           dotnet-version: '9.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore Wijkagent/Wijkagent.csproj
 
-      - name: Build
-        run: dotnet build --configuration Release --no-restore
+      - name: Build project
+        run: dotnet build Wijkagent/Wijkagent.csproj --configuration Release --no-restore
