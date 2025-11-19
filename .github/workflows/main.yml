@@ -13,25 +13,32 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # Checkout de code
+      # 1️⃣ Checkout code
       - uses: actions/checkout@v3
 
-      # Installeer een beschikbare .NET 9 SDK
-      - name: Setup .NET 9
+      # 2️⃣ Setup .NET 9 Preview (beschikbare preview versie)
+      - name: Setup .NET 9 Preview
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '9.0.0'
+          dotnet-version: '9.0.0-preview.7.24405.7'
 
-      # Installeer MAUI workloads
+      # 3️⃣ Install MAUI workloads
       - name: Install MAUI workloads
         run: |
           dotnet workload install maui
           dotnet workload restore
 
-      # Restore dependencies voor Windows
+      # 4️⃣ Restore dependencies voor Windows
       - name: Restore dependencies
         run: dotnet restore Wijkagent/Wijkagent.csproj --runtime win-x64
 
-      # Build het project alleen voor Windows
+      # 5️⃣ Build het project voor Windows
       - name: Build project
         run: dotnet build Wijkagent/Wijkagent.csproj --configuration Release -p:RuntimeIdentifier=win-x64 --no-restore
+
+      # 6️⃣ Optioneel: upload de build artifacts
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wijkagent-Windows-Build
+          path: Wijkagent/bin/Release/net9.0-windows10.0.19041.0/win-x64/publish/
