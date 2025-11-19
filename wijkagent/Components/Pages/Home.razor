@@ -1,28 +1,39 @@
 ﻿@page "/"
 @inject IJSRuntime JS
 
-<PageTitle>Delicten Kaart</PageTitle>
-
 <h3>Delictenkaart van Nederland</h3>
 
 <div class="row">
     <div class="col-md-8">
-        <div id="crimeMap" style="height: 600px; width: 100%; border-radius: 8px;"></div>
+        <div id="crimeMap" style="height:600px; width:100%; border-radius:8px;"></div>
     </div>
+
     <div class="col-md-4">
-        <h5>Nieuw Delict Toevoegen</h5>
+        <h5>Nieuw delict toevoegen</h5>
 
         <div class="mb-2">
             <label>Latitude</label>
-            <input type="number" step="0.0001" class="form-control" @bind="newLat" />
+            <input type="number" step="0.0001" class="form-control" @bind="lat" />
         </div>
         <div class="mb-2">
             <label>Longitude</label>
-            <input type="number" step="0.0001" class="form-control" @bind="newLng" />
+            <input type="number" step="0.0001" class="form-control" @bind="lng" />
+        </div>
+        <div class="mb-2">
+            <label>Postcode</label>
+            <input type="text" class="form-control" @bind="postcode" />
+        </div>
+        <div class="mb-2">
+            <label>Stad</label>
+            <input type="text" class="form-control" @bind="city" />
+        </div>
+        <div class="mb-2">
+            <label>Provincie</label>
+            <input type="text" class="form-control" @bind="province" />
         </div>
         <div class="mb-2">
             <label>Omschrijving</label>
-            <input type="text" class="form-control" @bind="newDescription" />
+            <input type="text" class="form-control" @bind="description" />
         </div>
 
         <button class="btn btn-primary mt-2" @onclick="AddCrime">Toevoegen</button>
@@ -31,29 +42,54 @@
 </div>
 
 @code {
-    private double newLat = 52.1326;
-    private double newLng = 5.2913;
-    private string newDescription = "";
+    private double lat;
+    private double lng;
+    private string postcode = "";
+    private string city = "";
+    private string province = "";
+    private string description = "";
+
+    private DotNetObjectReference<Home>? objRef;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            objRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("initCrimeMap");
+            await JS.InvokeVoidAsync("setDotNetHelper", objRef);
         }
+    }
+
+    [JSInvokable]
+    public void MapClicked(double clickedLat, double clickedLng, string clickedPostcode, string clickedCity, string clickedProvince)
+    {
+        lat = clickedLat;
+        lng = clickedLng;
+        postcode = clickedPostcode;
+        city = clickedCity;
+        province = clickedProvince;
+
+        StateHasChanged(); // update inputvelden
     }
 
     private async Task AddCrime()
     {
-        if (!string.IsNullOrWhiteSpace(newDescription))
+        if (!string.IsNullOrWhiteSpace(description))
         {
-            await JS.InvokeVoidAsync("addCrime", newLat, newLng, newDescription);
-            newDescription = "";
+            string info = $"{description} ({postcode}, {city}, {province})";
+            await JS.InvokeVoidAsync("addCrime", lat, lng, info);
+            description = "";
         }
     }
 
     private async Task ClearCrimes()
     {
         await JS.InvokeVoidAsync("clearCrimes");
+    }
+
+    public void Dispose()
+    {
+        objRef?.Dispose();
     }
 }
