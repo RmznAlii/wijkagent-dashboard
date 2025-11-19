@@ -16,11 +16,11 @@ jobs:
       # Checkout de code
       - uses: actions/checkout@v3
 
-      # Installeer .NET 9 SDK
+      # Installeer een beschikbare .NET 9 SDK
       - name: Setup .NET 9
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '9.0.0'
 
       # Installeer MAUI workloads
       - name: Install MAUI workloads
@@ -28,7 +28,7 @@ jobs:
           dotnet workload install maui
           dotnet workload restore
 
-      # Restore dependencies voor Windows runtime
+      # Restore dependencies voor Windows
       - name: Restore dependencies
         run: dotnet restore Wijkagent/Wijkagent.csproj --runtime win-x64
 
