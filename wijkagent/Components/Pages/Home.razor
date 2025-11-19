@@ -1,5 +1,59 @@
 ﻿@page "/"
+@inject IJSRuntime JS
 
-<h1>Hello, world!</h1>
+<PageTitle>Delicten Kaart</PageTitle>
 
-Welcome to your new app.
+<h3>Delictenkaart van Nederland</h3>
+
+<div class="row">
+    <div class="col-md-8">
+        <div id="crimeMap" style="height: 600px; width: 100%; border-radius: 8px;"></div>
+    </div>
+    <div class="col-md-4">
+        <h5>Nieuw Delict Toevoegen</h5>
+
+        <div class="mb-2">
+            <label>Latitude</label>
+            <input type="number" step="0.0001" class="form-control" @bind="newLat" />
+        </div>
+        <div class="mb-2">
+            <label>Longitude</label>
+            <input type="number" step="0.0001" class="form-control" @bind="newLng" />
+        </div>
+        <div class="mb-2">
+            <label>Omschrijving</label>
+            <input type="text" class="form-control" @bind="newDescription" />
+        </div>
+
+        <button class="btn btn-primary mt-2" @onclick="AddCrime">Toevoegen</button>
+        <button class="btn btn-secondary mt-2 ms-2" @onclick="ClearCrimes">Alles Verwijderen</button>
+    </div>
+</div>
+
+@code {
+    private double newLat = 52.1326;
+    private double newLng = 5.2913;
+    private string newDescription = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("initCrimeMap");
+        }
+    }
+
+    private async Task AddCrime()
+    {
+        if (!string.IsNullOrWhiteSpace(newDescription))
+        {
+            await JS.InvokeVoidAsync("addCrime", newLat, newLng, newDescription);
+            newDescription = "";
+        }
+    }
+
+    private async Task ClearCrimes()
+    {
+        await JS.InvokeVoidAsync("clearCrimes");
+    }
+}

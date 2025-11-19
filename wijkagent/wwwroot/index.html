@@ -2,29 +2,42 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0,
+                   maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>WijkAgent</title>
+
     <base href="/" />
+
+    <!-- Styles -->
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="WijkAgent.styles.css" />
-    <link rel="icon" href="data:,">
+    <link rel="icon" href="data:," />
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 
 <body>
 
-    <div class="status-bar-safe-area"></div>
+<div id="app">Loading...</div>
 
-    <div id="app">Loading...</div>
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
 
-    <div id="blazor-error-ui">
-        An unhandled error has occurred.
-        <a href="" class="reload">Reload</a>
-        <a class="dismiss">🗙</a>
-    </div>
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <script src="_framework/blazor.webview.js" autostart="false"></script>
+<!-- Custom JavaScript -->
+<script src="js/map.js"></script>
+
+<!-- Blazor WebView -->
+<script src="_framework/blazor.webview.js" autostart="false"></script>
 
 </body>
-
 </html>
