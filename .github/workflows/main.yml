@@ -11,21 +11,27 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
+      # Checkout de code
       - uses: actions/checkout@v3
 
+      # Installeer .NET 9 SDK
       - name: Setup .NET 9
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '9.0.x'
 
+      # Installeer MAUI workloads
       - name: Install MAUI workloads
         run: |
           dotnet workload install maui
           dotnet workload restore
 
+      # Restore dependencies voor Windows runtime
       - name: Restore dependencies
         run: dotnet restore Wijkagent/Wijkagent.csproj --runtime win-x64
 
+      # Build het project alleen voor Windows
       - name: Build project
         run: dotnet build Wijkagent/Wijkagent.csproj --configuration Release -p:RuntimeIdentifier=win-x64 --no-restore
