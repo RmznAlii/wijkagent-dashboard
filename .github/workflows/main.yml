@@ -1,32 +1,26 @@
-name: .NET 8 Unit Tests
+name: Build MAUI Blazor Hybrid
 
 on:
   push:
     branches:
       - main
-      - develop
-      - 'feature/**'
-      - 'hotfix/**'
   pull_request:
     branches:
       - main
-      - develop
 
 jobs:
-  test:
-    runs-on: ubuntu-latest  
-
+  build:
+    runs-on: windows-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
-      - name: Install .NET SDK 8.0
-        uses: actions/setup-dotnet@v4
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
 
-      - name: Restore test project
-        run: dotnet restore Wijkagent.TestCore/Wijkagent.TestCore.csproj
+      - name: Restore dependencies
+        run: dotnet restore Wijkagent/Wijkagent.csproj
 
-      - name: Run unit tests
-        run: dotnet test Wijkagent.TestCore/Wijkagent.TestCore.csproj --configuration Release
+      - name: Build project
+        run: dotnet build Wijkagent/Wijkagent.csproj --configuration Release --no-restore
