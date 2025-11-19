@@ -1,4 +1,4 @@
-name: .NET 9 Unit Tests
+name: .NET 8 Unit Tests
 
 on:
   push:
@@ -20,10 +20,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install .NET SDK 9.0
+      - name: Install .NET SDK 8.0
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '8.0.x'
 
       - name: Restore test project
         run: dotnet restore Wijkagent.TestCore/Wijkagent.TestCore.csproj
