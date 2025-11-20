@@ -49,33 +49,14 @@ window.setDotNetHelper = (helper) => {
     console.log("DotNetObjectReference set");
 };
 
-const markerIcon = L.Icon.extend({
-    options: {
-        iconSize: [37, 37],
-        iconAnchor: [12, 37]
-    }
-});
-
-const markerGreen = new markerIcon({ iconUrl: '/images/green_marker.png' });
-const markerPink = new markerIcon({ iconUrl: '/images/pink_marker.png' });
-const markerBlue = new markerIcon({ iconUrl: '/images/blue_marker.png' });
-
-
-
-window.addCrime = (lat, lng, description, type) => {
+window.addCrime = (lat, lng, description) => {
     if (!window._crimeMap) return;
 
-    let markerColor = markerBlue; // fallback
-
-    if (type === "Diefstal") markerColor = markerPink;     // Diefstal
-    if (type === "Vandalisme") markerColor = markerBlue;     // Vandalisme
-    if (type === "Overlast") markerColor = markerGreen;    // Overlast
-
-    const marker = L.marker([lat, lng], { icon: markerColor }).addTo(window._crimeMap)
+    const marker = L.marker([lat, lng]).addTo(window._crimeMap)
         .bindPopup(description);
 
     window._markers.push(marker);
-    console.log(`Marker added: ${lat}, ${lng},${type},${description}`);
+    console.log(`Marker added: ${lat}, ${lng}, ${description}`);
 };
 
 window.clearCrimes = () => {
