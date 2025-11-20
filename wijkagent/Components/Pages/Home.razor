@@ -29,8 +29,19 @@
         </div>
         <div class="mb-2">
             <label>Provincie</label>
-            <input type="text" class="form-control" @bind="province" />
+            <input type="" class="form-control" @bind="province" />
         </div>
+
+        <div class="mb-2">
+            <label>Type</label>
+            <select type="" class="form-control" @bind="type">
+                <option value="">Kies de type misdaad</option>
+                <option value="Diefstal">Diefstal</option>
+                <option value="Vandalisme">Vandalisme</option>
+                <option value="Overlast">Overlast</option>
+            </select>
+        </div>
+
         <div class="mb-2">
             <label>Omschrijving</label>
             <input type="text" class="form-control" @bind="description" />
@@ -47,6 +58,7 @@
     private string postcode = "";
     private string city = "";
     private string province = "";
+    private string type = "";
     private string description = "";
 
     private DotNetObjectReference<Home>? objRef;
@@ -75,11 +87,12 @@
 
     private async Task AddCrime()
     {
-        if (!string.IsNullOrWhiteSpace(description))
+        if (!string.IsNullOrWhiteSpace(description) && !string.IsNullOrWhiteSpace(type))
         {
-            string info = $"{description} ({postcode}, {city}, {province})";
-            await JS.InvokeVoidAsync("addCrime", lat, lng, info);
+            string info = $"{type}, {description} ({postcode}, {city}, {province})";
+            await JS.InvokeVoidAsync("addCrime", lat, lng, info, type);
             description = "";
+            type = "";
         }
     }
 
