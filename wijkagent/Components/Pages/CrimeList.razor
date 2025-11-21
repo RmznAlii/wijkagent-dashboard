@@ -1,0 +1,14 @@
+@using WijkAgent.Models
+
+@foreach (var crime in Crimes)
+{
+    <div class="card mb-2 p-2 shadow-sm">
+        <b>@crime.Type</b> – @crime.Description <br />
+        <small>@crime.DateTimeString</small><br />
+        <small>@crime.Address</small>
+    </div>
+}
+
+@code {
+    [Parameter] public List<CrimeModel> Crimes { get; set; } = new();
+}
