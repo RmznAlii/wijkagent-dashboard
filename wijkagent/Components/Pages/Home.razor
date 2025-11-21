@@ -33,6 +33,11 @@
         </div>
 
         <div class="mb-2">
+            <label>Datum en tijd</label>
+            <input type="datetime-local" class="form-control" @bind="incidentDateTime" />
+        </div>
+
+        <div class="mb-2">
             <label>Type</label>
             <select class="form-control" @bind="type">
                 <option value="">Kies de type misdaad</option>
@@ -66,6 +71,7 @@
     private string province = "";
     private string type = "";
     private string description = "";
+    private DateTime incidentDateTime = DateTime.Now;
 
     private DotNetObjectReference<Home>? objRef;
 
@@ -109,10 +115,14 @@
                 return;
             }
 
-            string info = $"{type}, {description} ({street} {houseNumber}, {postcode}, {city}, {province})";
+            var dt = incidentDateTime.ToString("dd-MM-yyyy HH:mm");
+            string info = $"{type}, {description} — {dt} <br/> ({street} {houseNumber}, {postcode}, {city}, {province})";
             await JS.InvokeVoidAsync("addCrime", lat, lng, info, type);
+
+            // reset formulier velden (behoud datum/tijd optioneel — hier reset naar nu)
             description = "";
             type = "";
+            incidentDateTime = DateTime.Now;
         }
     }
 
