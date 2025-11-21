@@ -12,7 +12,7 @@ window.initCrimeMap = () => {
         attribution: '© OpenStreetMap'
     }).addTo(window._crimeMap);
 
-    // Klik event
+    // Klik event op kaart blijft beschikbaar
     window._crimeMap.on('click', async function (e) {
         const lat = e.latlng.lat;
         const lng = e.latlng.lng;
@@ -21,6 +21,8 @@ window.initCrimeMap = () => {
         let postcode = "";
         let city = "";
         let province = "";
+        let street = "";
+        let houseNumber = "";
 
         try {
             // Reverse geocoding via Nominatim
@@ -28,17 +30,20 @@ window.initCrimeMap = () => {
             const response = await fetch(url);
             const data = await response.json();
 
-            if (data.address) {
+            if (data && data.address) {
                 postcode = data.address.postcode || "";
                 city = data.address.city || data.address.town || data.address.village || "";
                 province = data.address.state || "";
+                street = data.address.road || data.address.pedestrian || data.address.cycleway || "";
+                houseNumber = data.address.house_number || "";
             }
         } catch (err) {
             console.error("Reverse geocoding failed:", err);
         }
 
+        // Meld locatie terug naar Blazor inclusief street + houseNumber
         if (window.dotnetHelper) {
-            window.dotnetHelper.invokeMethodAsync('MapClicked', lat, lng, postcode, city, province)
+            window.dotnetHelper.invokeMethodAsync('MapClicked', lat, lng, postcode, city, province, street, houseNumber)
                 .catch(err => console.error('JS Interop error:', err));
         }
     });
@@ -49,14 +54,86 @@ window.setDotNetHelper = (helper) => {
     console.log("DotNetObjectReference set");
 };
 
-window.addCrime = (lat, lng, description) => {
+// Geocode adres (straat + huisnummer + postcode/plaats/provincie) en plaats pin
+window.placePinByAddress = async (street, houseNumber, postcode, city, province) => {
     if (!window._crimeMap) return;
 
-    const marker = L.marker([lat, lng]).addTo(window._crimeMap)
-        .bindPopup(description);
+    const parts = [];
+    if (street) parts.push(street + (houseNumber ? ' ' + houseNumber : ''));
+    if (postcode) parts.push(postcode);
+    if (city) parts.push(city);
+    if (province) parts.push(province);
+    const query = encodeURIComponent(parts.join(', '));
+    const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&q=${query}`;
+
+    try {
+        const response = await fetch(url, { headers: { 'User-Agent': 'wijkagent-app/1.0 (your-email@example.com)' }});
+        const results = await response.json();
+        if (results && results.length > 0) {
+            const r = results[0];
+            const lat = parseFloat(r.lat);
+            const lng = parseFloat(r.lon);
+
+            const desc = `${street || (r.display_name || "")} ${houseNumber || ""} <br/> ${postcode || ""} ${city || ""}`.trim();
+
+            // Use blue default icon for placed pins (user requested default blue)
+            const marker = L.marker([lat, lng], { icon: markerBlue }).addTo(window._crimeMap)
+                .bindPopup(desc);
+            window._markers.push(marker);
+            window._crimeMap.setView([lat, lng], 16);
+
+            // probeer postcode/city/province/straat/huisnummer uit antwoord te halen als leeg
+            const addr = r.address || {};
+            const foundPostcode = addr.postcode || postcode || "";
+            const foundCity = addr.city || addr.town || addr.village || city || "";
+            const foundProvince = addr.state || province || "";
+            const foundStreet = addr.road || addr.pedestrian || addr.cycleway || street || "";
+            const foundHouse = addr.house_number || houseNumber || "";
+
+            // Meld locatie terug naar Blazor zodat lat/lng en adresvelden updaten (inclusief street/house)
+            if (window.dotnetHelper) {
+                window.dotnetHelper.invokeMethodAsync('MapClicked', lat, lng, foundPostcode, foundCity, foundProvince, foundStreet, foundHouse)
+                    .catch(err => console.error('JS Interop error:', err));
+            }
+        } else {
+            console.warn("Geen resultaten voor adres:", query);
+            alert("Adres niet gevonden, probeer andere zoekgegevens.");
+        }
+    } catch (err) {
+        console.error("Geocoding failed:", err);
+        alert("Fout bij zoeken van adres. Kijk console voor details.");
+    }
+};
+
+// icon class and instances (default blue)
+const markerIcon = L.Icon.extend({
+    options: {
+        iconSize: [37, 37],
+        iconAnchor: [12, 37],
+        popupAnchor: [1, -34]
+    }
+});
+
+const markerGreen = new markerIcon({ iconUrl: '/images/green_marker.png' });
+const markerPink = new markerIcon({ iconUrl: '/images/pink_marker.png' });
+const markerBlue = new markerIcon({ iconUrl: '/images/blue_marker.png' });
+
+// Voeg misdaad-marker toe (AddCrime vanuit Blazor) met image-pin per type
+window.addCrime = (lat, lng, description, type) => {
+    if (!window._crimeMap) return;
+
+    // fallback is blue
+    let markerColor = markerBlue;
+
+    if (type === "Diefstal") markerColor = markerPink;     // Diefstal -> pink
+    if (type === "Vandalisme") markerColor = markerBlue;   // Vandalisme -> blue
+    if (type === "Overlast") markerColor = markerGreen;    // Overlast -> green
+
+    const marker = L.marker([lat, lng], { icon: markerColor }).addTo(window._crimeMap)
+      .bindPopup(description);
 
     window._markers.push(marker);
-    console.log(`Marker added: ${lat}, ${lng}, ${description}`);
+    console.log(`Marker added: ${lat}, ${lng}, ${description}, ${type}`);
 };
 
 window.clearCrimes = () => {

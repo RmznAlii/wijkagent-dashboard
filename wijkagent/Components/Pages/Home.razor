@@ -12,29 +12,34 @@
         <h5>Nieuw delict toevoegen</h5>
 
         <div class="mb-2">
-            <label>Latitude</label>
-            <input type="number" step="0.0001" class="form-control" @bind="lat" />
+            <label>Straat</label>
+            <input type="text" class="form-control" @bind="street" @oninput="(_) => ClearLatLng()" />
         </div>
         <div class="mb-2">
-            <label>Longitude</label>
-            <input type="number" step="0.0001" class="form-control" @bind="lng" />
+            <label>Huisnummer</label>
+            <input type="text" class="form-control" @bind="houseNumber" @oninput="(_) => ClearLatLng()" />
         </div>
         <div class="mb-2">
             <label>Postcode</label>
-            <input type="text" class="form-control" @bind="postcode" />
+            <input type="text" class="form-control" @bind="postcode" @oninput="(_) => ClearLatLng()" />
         </div>
         <div class="mb-2">
             <label>Stad</label>
-            <input type="text" class="form-control" @bind="city" />
+            <input type="text" class="form-control" @bind="city" @oninput="(_) => ClearLatLng()" />
         </div>
         <div class="mb-2">
             <label>Provincie</label>
-            <input type="" class="form-control" @bind="province" />
+            <input type="text" class="form-control" @bind="province" @oninput="(_) => ClearLatLng()" />
+        </div>
+
+        <div class="mb-2">
+            <label>Datum en tijd</label>
+            <input type="datetime-local" class="form-control" @bind="incidentDateTime" />
         </div>
 
         <div class="mb-2">
             <label>Type</label>
-            <select type="" class="form-control" @bind="type">
+            <select class="form-control" @bind="type">
                 <option value="">Kies de type misdaad</option>
                 <option value="Diefstal">Diefstal</option>
                 <option value="Vandalisme">Vandalisme</option>
@@ -47,19 +52,26 @@
             <input type="text" class="form-control" @bind="description" />
         </div>
 
-        <button class="btn btn-primary mt-2" @onclick="AddCrime">Toevoegen</button>
-        <button class="btn btn-secondary mt-2 ms-2" @onclick="ClearCrimes">Alles Verwijderen</button>
+        <div class="mt-2">
+            <button class="btn btn-outline-primary" @onclick="PlacePin">Zoek adres</button>
+            <button class="btn btn-primary ms-2" @onclick="AddCrime">Delict toevoegen</button>
+            <button class="btn btn-secondary ms-2" @onclick="ClearCrimes">Alles Verwijderen</button>
+        </div>
     </div>
 </div>
 
 @code {
+    // lat/lng blijven intern bewaard maar niet als invoervelden zichtbaar
     private double lat;
     private double lng;
+    private string street = "";
+    private string houseNumber = "";
     private string postcode = "";
     private string city = "";
     private string province = "";
     private string type = "";
     private string description = "";
+    private DateTime incidentDateTime = DateTime.Now;
 
     private DotNetObjectReference<Home>? objRef;
 
@@ -73,32 +85,57 @@
         }
     }
 
+    // Wordt aangeroepen door JS wanneer kaart of geocoding een locatie teruggeeft
     [JSInvokable]
-    public void MapClicked(double clickedLat, double clickedLng, string clickedPostcode, string clickedCity, string clickedProvince)
+    public void MapClicked(double clickedLat, double clickedLng, string clickedPostcode, string clickedCity, string clickedProvince, string clickedStreet, string clickedHouseNumber)
     {
         lat = clickedLat;
         lng = clickedLng;
         postcode = clickedPostcode;
         city = clickedCity;
         province = clickedProvince;
+        street = clickedStreet ?? "";
+        houseNumber = clickedHouseNumber ?? "";
 
-        StateHasChanged(); // update inputvelden
+        StateHasChanged();
+    }
+
+    private async Task PlacePin()
+    {
+        await JS.InvokeVoidAsync("placePinByAddress", street, houseNumber, postcode, city, province);
     }
 
     private async Task AddCrime()
     {
         if (!string.IsNullOrWhiteSpace(description) && !string.IsNullOrWhiteSpace(type))
         {
-            string info = $"{type}, {description} ({postcode}, {city}, {province})";
+            // lat/lng moeten gezet zijn door MapClicked of PlacePin eerder
+            if (lat == 0 && lng == 0)
+            {
+                return;
+            }
+
+            var dt = incidentDateTime.ToString("dd-MM-yyyy HH:mm");
+            string info = $"{type}, {description} — {dt} <br/> ({street} {houseNumber}, {postcode}, {city}, {province})";
             await JS.InvokeVoidAsync("addCrime", lat, lng, info, type);
+
+            // reset formulier velden (behoud datum/tijd optioneel — hier reset naar nu)
             description = "";
             type = "";
+            incidentDateTime = DateTime.Now;
         }
     }
 
     private async Task ClearCrimes()
     {
         await JS.InvokeVoidAsync("clearCrimes");
+    }
+
+    private void ClearLatLng()
+    {
+        // When the user edits address fields, discard previously clicked/geocoded coordinates.
+        lat = 0;
+        lng = 0;
     }
 
     public void Dispose()
