@@ -1,4 +1,5 @@
 ﻿@page "/"
+@using WijkAgent.Models
 @inject IJSRuntime JS
 
 <h3>Delictenkaart van Nederland</h3>
@@ -60,7 +61,16 @@
     </div>
 </div>
 
+<div class="row mt-4">
+    <div class="col-md-12">
+        <h5>Overzicht van delicten</h5>
+        <CrimeList Crimes="@crimes" />
+    </div>
+</div>
+
 @code {
+    private List<CrimeModel> crimes = new();
+
     // lat/lng blijven intern bewaard maar niet als invoervelden zichtbaar
     private double lat;
     private double lng;
@@ -107,28 +117,48 @@
 
     private async Task AddCrime()
     {
-        if (!string.IsNullOrWhiteSpace(description) && !string.IsNullOrWhiteSpace(type))
+        if (string.IsNullOrWhiteSpace(description) || string.IsNullOrWhiteSpace(type))
         {
-            // lat/lng moeten gezet zijn door MapClicked of PlacePin eerder
-            if (lat == 0 && lng == 0)
-            {
-                return;
-            }
-
-            var dt = incidentDateTime.ToString("dd-MM-yyyy HH:mm");
-            string info = $"{type}, {description} — {dt} <br/> ({street} {houseNumber}, {postcode}, {city}, {province})";
-            await JS.InvokeVoidAsync("addCrime", lat, lng, info, type);
-
-            // reset formulier velden (behoud datum/tijd optioneel — hier reset naar nu)
-            description = "";
-            type = "";
-            incidentDateTime = DateTime.Now;
+            return;
         }
+
+        // lat/lng moeten gezet zijn door MapClicked of PlacePin eerder
+        if (lat == 0 && lng == 0)
+        {
+            return;
+        }
+
+        var dt = incidentDateTime.ToString("dd-MM-yyyy HH:mm");
+        string info =
+            $"{type}, {description} — {dt} <br/> ({street} {houseNumber}, {postcode}, {city}, {province})";
+
+        // eerst JS marker plaatsen
+        await JS.InvokeVoidAsync("addCrime", lat, lng, info, type);
+
+        // daarna toevoegen aan de C#-lijst voor de UI-lijst
+        crimes.Add(new CrimeModel
+        {
+            Type = type,
+            Description = description,
+            Address = $"{street} {houseNumber}, {postcode} {city}, {province}",
+            DateTimeString = dt,
+            Lat = lat,
+            Lng = lng
+        });
+
+        // formulier resetten
+        description = "";
+        type = "";
+        incidentDateTime = DateTime.Now;
+
+        StateHasChanged();
     }
 
     private async Task ClearCrimes()
     {
         await JS.InvokeVoidAsync("clearCrimes");
+        crimes.Clear();
+        StateHasChanged();
     }
 
     private void ClearLatLng()
