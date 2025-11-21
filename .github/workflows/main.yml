@@ -1,44 +1,57 @@
-name: Build MAUI Blazor Hybrid
+name: Build MAUI Blazor Hybrid (.NET 9)
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-      # 1️⃣ Checkout code
       - uses: actions/checkout@v3
 
-      # 2️⃣ Setup .NET 9 Preview (beschikbare preview versie)
-      - name: Setup .NET 9 Preview
+      # ✔ Installeert automatisch de meest recente .NET 9 preview
+      - name: Install .NET 9 (latest prerelease)
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '9.0.0-preview.7.24405.7'
+          dotnet-version: '9.0.x'
+          include-prerelease: true
 
-      # 3️⃣ Install MAUI workloads
+      # ✔ MAUI workloads (desktop nodig voor Windows)
       - name: Install MAUI workloads
         run: |
           dotnet workload install maui
+          dotnet workload install maui-desktop
           dotnet workload restore
 
-      # 4️⃣ Restore dependencies voor Windows
-      - name: Restore dependencies
-        run: dotnet restore Wijkagent/Wijkagent.csproj --runtime win-x64
+      # ✔ Restore
+      - name: Restore
+        run: dotnet restore Wijkagent/Wijkagent.csproj -r win-x64
 
-      # 5️⃣ Build het project voor Windows
-      - name: Build project
-        run: dotnet build Wijkagent/Wijkagent.csproj --configuration Release -p:RuntimeIdentifier=win-x64 --no-restore
+      # ✔ Build
+      - name: Build
+        run: dotnet build Wijkagent/Wijkagent.csproj `
+              -c Release `
+              -r win-x64 `
+              --no-restore `
+              -p:EnablePreviewFeatures=true `
+              -p:PublishAot=false
 
-      # 6️⃣ Optioneel: upload de build artifacts
-      - name: Upload build artifacts
+      # ✔ Publish naar een vaste map
+      - name: Publish
+        run: dotnet publish Wijkagent/Wijkagent.csproj `
+              -c Release `
+              -r win-x64 `
+              -p:PublishTrimmed=false `
+              -p:PublishAot=false `
+              -o publish
+
+      # ✔ Artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Wijkagent-Windows-Build
-          path: Wijkagent/bin/Release/net9.0-windows10.0.19041.0/win-x64/publish/
+          name: wijkagent-win-x64
+          path: publish/
