@@ -1,57 +1,45 @@
-name: Build MAUI Blazor Hybrid (.NET 9)
+name: Build MAUI Blazor Hybrid
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v3
+    # 1️⃣ Checkout
+    - uses: actions/checkout@v3
 
-      # ✔ Installeert automatisch de meest recente .NET 9 preview
-      - name: Install .NET 9 (latest prerelease)
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '9.0.x'
-          include-prerelease: true
+    # 2️⃣ Install .NET 9 Preview
+    - name: Setup .NET 9 Preview
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 9.0.x
+        include-prerelease: true
 
-      # ✔ MAUI workloads (desktop nodig voor Windows)
-      - name: Install MAUI workloads
-        run: |
-          dotnet workload install maui
-          dotnet workload install maui-desktop
-          dotnet workload restore
+    # 3️⃣ Install MAUI workload
+    - name: Install MAUI workloads
+      run: dotnet workload install maui maui-windows
 
-      # ✔ Restore
-      - name: Restore
-        run: dotnet restore Wijkagent/Wijkagent.csproj -r win-x64
+    # 4️⃣ Restore (GEEN runtime!)
+    - name: Restore
+      run: dotnet restore Wijkagent/Wijkagent.csproj
 
-      # ✔ Build
-      - name: Build
-        run: dotnet build Wijkagent/Wijkagent.csproj `
-              -c Release `
-              -r win-x64 `
-              --no-restore `
-              -p:EnablePreviewFeatures=true `
-              -p:PublishAot=false
+    # 5️⃣ Build Release Windows
+    - name: Build Windows
+      run: dotnet build Wijkagent/Wijkagent.csproj -c Release -p:RuntimeIdentifier=win10-x64 --no-restore
 
-      # ✔ Publish naar een vaste map
-      - name: Publish
-        run: dotnet publish Wijkagent/Wijkagent.csproj `
-              -c Release `
-              -r win-x64 `
-              -p:PublishTrimmed=false `
-              -p:PublishAot=false `
-              -o publish
+    # 6️⃣ Publish
+    - name: Publish Windows
+      run: dotnet publish Wijkagent/Wijkagent.csproj -c Release -p:RuntimeIdentifier=win10-x64 -o publish --no-restore
 
-      # ✔ Artifacts
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: wijkagent-win-x64
-          path: publish/
+    # 7️⃣ Upload artifacts
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Wijkagent-Windows
+        path: publish
