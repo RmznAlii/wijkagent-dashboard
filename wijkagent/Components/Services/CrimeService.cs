@@ -60,40 +60,17 @@ public class CrimeService : ICrimeService
 
     public Task ClearAsync()
     {
-        // lijst leegmaken, maar NIET opnieuw seeden
         _crimes.Clear();
-        _isSeeded = true; // voorkomt opnieuw seeden
+        _isSeeded = true; // voorkom opnieuw seeden
         return Task.CompletedTask;
     }
 
     private void EnsureSeeded()
     {
+        // Geen default delicten meer seeden
         if (_isSeeded) return;
 
-        _crimes.AddRange(new[]
-        {
-            new CrimeModel
-            {
-                Id = 1,
-                Type = "Diefstal",
-                Description = "Fiets gestolen bij station",
-                Address = "Stationsplein 1",
-                DateTimeString = "2025-12-01 14:30",
-                Lat = 52.307,
-                Lng = 5.040
-            },
-            new CrimeModel
-            {
-                Id = 2,
-                Type = "Vernieling",
-                Description = "Ruit ingegooid",
-                Address = "Hoofdstraat 12",
-                DateTimeString = "2025-12-01 18:10",
-                Lat = 52.308,
-                Lng = 5.042
-            }
-        });
-
+        // Hier niks toevoegen
         _isSeeded = true;
     }
 }
