@@ -1,36 +1,41 @@
-name: .NET MAUI build
+name: Build MAUI Blazor Hybrid
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: windows-latest
 
-    strategy:
-      matrix:
-        configuration: [ Debug, Release ]
-
-    env:
-      SOLUTION_FILE: wijkagent/WijkAgent.sln
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v3
 
-      - name: Install .NET SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 9.0.x
+    - name: Setup .NET 9 Preview
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 9.0.x
+        include-prerelease: true
 
-      - name: Install .NET MAUI workload
-        run: dotnet workload install maui
+    - name: Install MAUI workloads
+      run: dotnet workload install maui maui-windows
 
-      - name: Restore solution
-        run: dotnet restore $env:SOLUTION_FILE
+    # 🔹 Restore (zonder RID)
+    - name: Restore
+      run: dotnet restore Wijkagent/Wijkagent.csproj
 
-      - name: Build solution
-        run: dotnet build $env:SOLUTION_FILE --configuration ${{ matrix.configuration }} --no-restore
+    # 🔹 Build *alleen* Windows TFM
+    - name: Build Windows
+      run: dotnet build Wijkagent/Wijkagent.csproj -c Release --framework net9.0-windows10.0.19041.0
+
+    # 🔹 Publish Windows
+    - name: Publish Windows
+      run: dotnet publish Wijkagent/Wijkagent.csproj -c Release --framework net9.0-windows10.0.19041.0 -o publish
+
+    # 🔹 Upload artifacts
+    - uses: actions/upload-artifact@v4
+      with:
+        name: Wijkagent-Windows
+        path: publish
