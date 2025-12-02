@@ -1,16 +1,35 @@
 ﻿@inherits LayoutComponentBase
 
 <div class="page">
-    <div class="sidebar">
-        <NavMenu/>
-    </div>
-
     <main>
+        <!-- Top navbar -->
         <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            <a class="navbar-brand" href="">112 Delicten</a>
+
+            <!-- Nav links -->
+            <div class="nav-scrollable">
+                <nav class="flex-row">
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                            <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span>Home
+                        </NavLink>
+                    </div>
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="database">
+                            <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span>Database
+                        </NavLink>
+                    </div>
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="weather">
+                            <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span>Weather
+                        </NavLink>
+                    </div>
+                </nav>
+            </div>
         </div>
 
-        <article class="content px-4">
+        <!-- Pagina content -->
+        <article class="content">
             @Body
         </article>
     </main>

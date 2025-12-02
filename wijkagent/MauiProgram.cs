@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using WijkAgent.Data;
 
 namespace WijkAgent;
 
@@ -9,9 +11,18 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
-            .ConfigureFonts(fonts => { fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular"); });
+            .ConfigureFonts(fonts =>
+            {
+                fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
+            });
 
         builder.Services.AddMauiBlazorWebView();
+
+        // ✅ Voeg DbContext voor MySQL toe
+        var connectionString = "server=127.0.0.1;database=wijkagent;user=root;password=;";
+        builder.Services.AddDbContext<WijkAgentDbContext>(options =>
+            options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))
+        );
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();

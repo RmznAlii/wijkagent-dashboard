@@ -1,6 +1,13 @@
 ﻿@page "/"
+@using Microsoft.EntityFrameworkCore
 @using WijkAgent.Models
+@using WijkAgent.Data
+@inject WijkAgentDbContext Db
 @inject IJSRuntime JS
+
+<div class="navbar d-flex align-items-center mb-3">
+    <img src="images/politie.svg" class="header-logo me-2" style="height:50px;" />
+</div>
 
 <h3>Delictenkaart van Nederland</h3>
 
@@ -12,90 +19,150 @@
     <div class="col-md-4">
         <h5>Nieuw delict toevoegen</h5>
 
-        <div class="mb-2">
-            <label>Straat</label>
-            <input type="text" class="form-control" @bind="street" @oninput="(_) => ClearLatLng()" />
-        </div>
-        <div class="mb-2">
-            <label>Huisnummer</label>
-            <input type="text" class="form-control" @bind="houseNumber" @oninput="(_) => ClearLatLng()" />
-        </div>
-        <div class="mb-2">
-            <label>Postcode</label>
-            <input type="text" class="form-control" @bind="postcode" @oninput="(_) => ClearLatLng()" />
-        </div>
-        <div class="mb-2">
-            <label>Stad</label>
-            <input type="text" class="form-control" @bind="city" @oninput="(_) => ClearLatLng()" />
-        </div>
-        <div class="mb-2">
-            <label>Provincie</label>
-            <input type="text" class="form-control" @bind="province" @oninput="(_) => ClearLatLng()" />
-        </div>
-
-        <div class="mb-2">
-            <label>Datum en tijd</label>
-            <input type="datetime-local" class="form-control" @bind="incidentDateTime" />
-        </div>
-
+        <div class="mb-2"><label>Straat</label><input class="form-control" @bind="street"/></div>
+        <div class="mb-2"><label>Huisnummer</label><input class="form-control" @bind="houseNumber"/></div>
+        <div class="mb-2"><label>Postcode</label><input class="form-control" @bind="postcode"/></div>
+        <div class="mb-2"><label>Stad</label><input class="form-control" @bind="city"/></div>
+        <div class="mb-2"><label>Provincie</label><input class="form-control" @bind="province"/></div>
+        <div class="mb-2"><label>Datum en tijd</label><input type="datetime-local" class="form-control" @bind="incidentDateTime"/></div>
         <div class="mb-2">
             <label>Type</label>
             <select class="form-control" @bind="type">
-                <option value="">Kies de type misdaad</option>
+                <option value="">Kies type misdaad</option>
                 <option value="Diefstal">Diefstal</option>
                 <option value="Vandalisme">Vandalisme</option>
                 <option value="Overlast">Overlast</option>
             </select>
         </div>
-
-        <div class="mb-2">
-            <label>Omschrijving</label>
-            <input type="text" class="form-control" @bind="description" />
-        </div>
+        <div class="mb-2"><label>Omschrijving</label><input class="form-control" @bind="description"/></div>
 
         <div class="mt-2">
             <button class="btn btn-outline-primary" @onclick="PlacePin">Zoek adres</button>
             <button class="btn btn-primary ms-2" @onclick="AddCrime">Delict toevoegen</button>
-            <button class="btn btn-secondary ms-2" @onclick="ClearCrimes">Alles Verwijderen</button>
         </div>
     </div>
 </div>
 
-<div class="row mt-4">
-    <div class="col-md-12">
-        <h5>Overzicht van delicten</h5>
-        <CrimeList Crimes="@crimes" />
-    </div>
+<hr/>
+
+<div class="mt-4">
+    <button class="btn btn-secondary" @onclick="ToggleCrimeList">
+        @((showCrimeList ? "Sluit delicten" : "Delicten bekijken"))
+    </button>
+
+    @if (showCrimeList)
+    {
+        <div class="mt-3">
+            <div class="mb-3">
+                <label>Filter op type delict:</label>
+                <select class="form-control w-50" @bind="SelectedFilterType">
+                    <option value="">Alles</option>
+                    <option value="Diefstal">Diefstal</option>
+                    <option value="Vandalisme">Vandalisme</option>
+                    <option value="Overlast">Overlast</option>
+                </select>
+            </div>
+
+            @if (crimes == null)
+            {
+                <p>Loading...</p>
+            }
+            else if (!crimes.Any())
+            {
+                <p>Geen delicten gevonden.</p>
+            }
+            else
+            {
+                <table class="table table-striped">
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Type</th>
+                        <th>Omschrijving</th>
+                        <th>Adres</th>
+                        <th>Lat / Lng</th>
+                        <th>Tijd</th>
+                        <th>Acties</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var c in crimes)
+                    {
+                        <tr>
+                            <td>@c.Id</td>
+                            <td><input class="form-control" @bind="c.Type"/></td>
+                            <td><input class="form-control" @bind="c.Description"/></td>
+                            <td>@c.Street @c.HouseNumber, @c.Postcode @c.City, @c.Province</td>
+                            <td>@c.Lat, @c.Lng</td>
+                            <td>@c.IncidentDateTime.ToString("dd-MM-yyyy HH:mm")</td>
+                            <td>
+                                <button class="btn btn-sm btn-success me-1" @onclick="() => UpdateCrime(c)">Opslaan</button>
+                                <button class="btn btn-sm btn-danger" @onclick="() => DeleteCrime(c)">Verwijderen</button>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div>
+    }
 </div>
 
 @code {
-    private List<CrimeModel> crimes = new();
-
-    // lat/lng blijven intern bewaard maar niet als invoervelden zichtbaar
-    private double lat;
-    private double lng;
-    private string street = "";
-    private string houseNumber = "";
-    private string postcode = "";
-    private string city = "";
-    private string province = "";
-    private string type = "";
-    private string description = "";
+    private string street = "", houseNumber = "", postcode = "", city = "", province = "", type = "", description = "";
+    private double lat, lng;
     private DateTime incidentDateTime = DateTime.Now;
 
     private DotNetObjectReference<Home>? objRef;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private List<Crime>? crimes;
+    private List<Crime>? allCrimes;
+    private bool showCrimeList = false;
+    private string selectedFilterType = "";
+
+    private string SelectedFilterType
     {
-        if (firstRender)
+        get => selectedFilterType;
+        set
         {
-            objRef = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("initCrimeMap");
-            await JS.InvokeVoidAsync("setDotNetHelper", objRef);
+            selectedFilterType = value;
+            FilterCrimes();
         }
     }
 
-    // Wordt aangeroepen door JS wanneer kaart of geocoding een locatie teruggeeft
+    protected override async Task OnInitializedAsync() => await LoadCrimes();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (objRef == null)
+            objRef = DotNetObjectReference.Create(this);
+
+        await JS.InvokeVoidAsync("initCrimeMap");
+        await JS.InvokeVoidAsync("setDotNetHelper", objRef);
+
+        if (allCrimes != null)
+        {
+            var crimesJson = System.Text.Json.JsonSerializer.Serialize(allCrimes);
+            await JS.InvokeVoidAsync("showCrimesFiltered", crimesJson);
+        }
+    }
+
+    private async Task LoadCrimes()
+    {
+        allCrimes = await Db.Crimes.OrderByDescending(c => c.CreatedAt).ToListAsync();
+        FilterCrimes();
+    }
+
+    private void FilterCrimes()
+    {
+        crimes = string.IsNullOrEmpty(selectedFilterType)
+            ? allCrimes
+            : allCrimes?.Where(c => c.Type == selectedFilterType).ToList();
+
+        var crimesJson = System.Text.Json.JsonSerializer.Serialize(crimes);
+        _ = JS.InvokeVoidAsync("showCrimesFiltered", crimesJson);
+    }
+
     [JSInvokable]
     public void MapClicked(double clickedLat, double clickedLng, string clickedPostcode, string clickedCity, string clickedProvince, string clickedStreet, string clickedHouseNumber)
     {
@@ -106,70 +173,48 @@
         province = clickedProvince;
         street = clickedStreet ?? "";
         houseNumber = clickedHouseNumber ?? "";
-
         StateHasChanged();
     }
 
-    private async Task PlacePin()
-    {
-        await JS.InvokeVoidAsync("placePinByAddress", street, houseNumber, postcode, city, province);
-    }
+    private async Task PlacePin() => await JS.InvokeVoidAsync("placePinByAddress", street, houseNumber, postcode, city, province, type);
 
     private async Task AddCrime()
     {
-        if (string.IsNullOrWhiteSpace(description) || string.IsNullOrWhiteSpace(type))
-        {
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(description)) return;
+        if (lat == 0 && lng == 0) { await JS.InvokeVoidAsync("alert", "Klik eerst op de kaart of zoek een adres."); return; }
 
-        // lat/lng moeten gezet zijn door MapClicked of PlacePin eerder
-        if (lat == 0 && lng == 0)
-        {
-            return;
-        }
-
-        var dt = incidentDateTime.ToString("dd-MM-yyyy HH:mm");
-        string info =
-            $"{type}, {description} — {dt} <br/> ({street} {houseNumber}, {postcode}, {city}, {province})";
-
-        // eerst JS marker plaatsen
-        await JS.InvokeVoidAsync("addCrime", lat, lng, info, type);
-
-        // daarna toevoegen aan de C#-lijst voor de UI-lijst
-        crimes.Add(new CrimeModel
+        var crime = new Crime
         {
             Type = type,
             Description = description,
-            Address = $"{street} {houseNumber}, {postcode} {city}, {province}",
-            DateTimeString = dt,
+            Street = street,
+            HouseNumber = houseNumber,
+            Postcode = postcode,
+            City = city,
+            Province = province,
             Lat = lat,
-            Lng = lng
-        });
+            Lng = lng,
+            IncidentDateTime = incidentDateTime,
+            CreatedAt = DateTime.Now
+        };
 
-        // formulier resetten
-        description = "";
-        type = "";
+        Db.Crimes.Add(crime);
+        await Db.SaveChangesAsync();
+
+        await JS.InvokeVoidAsync("addCrime", crime.Lat, crime.Lng, crime.Description, crime.Type);
+
+        // Reset form
+        type = description = street = houseNumber = postcode = city = province = "";
+        lat = lng = 0;
         incidentDateTime = DateTime.Now;
 
-        StateHasChanged();
+        await LoadCrimes();
+        await JS.InvokeVoidAsync("alert", "Delict toegevoegd!");
     }
 
-    private async Task ClearCrimes()
-    {
-        await JS.InvokeVoidAsync("clearCrimes");
-        crimes.Clear();
-        StateHasChanged();
-    }
+    private async Task UpdateCrime(Crime crime) { Db.Crimes.Update(crime); await Db.SaveChangesAsync(); FilterCrimes(); }
 
-    private void ClearLatLng()
-    {
-        // When the user edits address fields, discard previously clicked/geocoded coordinates.
-        lat = 0;
-        lng = 0;
-    }
+    private async Task DeleteCrime(Crime crime) { Db.Crimes.Remove(crime); await Db.SaveChangesAsync(); await LoadCrimes(); }
 
-    public void Dispose()
-    {
-        objRef?.Dispose();
-    }
+    private void ToggleCrimeList() => showCrimeList = !showCrimeList;
 }
