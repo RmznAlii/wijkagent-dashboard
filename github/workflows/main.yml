@@ -1,45 +1,41 @@
-name: MAUI Blazor CI
+name: Build MAUI Blazor Hybrid
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: windows-latest
 
-    strategy:
-      matrix:
-        configuration: [ Debug, Release ]
-
-    env:
-      DOTNET_CLI_TELEMETRY_OPTOUT: true
-
     steps:
-      # 1. Code ophalen
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    - uses: actions/checkout@v3
 
-      # 2. .NET SDK installeren (pas aan als je een andere versie gebruikt)
-      - name: Install .NET SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 9.0.x
+    - name: Setup .NET 9 Preview
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 9.0.x
+        include-prerelease: true
 
-      # 3. MAUI workload installeren (nodig voor MAUI-projecten)
-      - name: Install .NET MAUI workload
-        run: dotnet workload install maui
+    - name: Install MAUI workloads
+      run: dotnet workload install maui maui-windows
 
-      # 4. Restore in de map waar WijkAgent.sln staat
-      - name: Restore solution
-        working-directory: wijkagent
-        run: dotnet restore WijkAgent.sln
+    # 🔹 Restore (zonder RID)
+    - name: Restore
+      run: dotnet restore Wijkagent/Wijkagent.csproj
 
-      # 5. Build (Debug / Release via matrix)
-      - name: Build solution
-        working-directory: wijkagent
-        run: dotnet build WijkAgent.sln -c ${{ matrix.configuration }} --no-restore
+    # 🔹 Build *alleen* Windows TFM
+    - name: Build Windows
+      run: dotnet build Wijkagent/Wijkagent.csproj -c Release --framework net9.0-windows10.0.19041.0
+
+    # 🔹 Publish Windows
+    - name: Publish Windows
+      run: dotnet publish Wijkagent/Wijkagent.csproj -c Release --framework net9.0-windows10.0.19041.0 -o publish
+
+    # 🔹 Upload artifacts
+    - uses: actions/upload-artifact@v4
+      with:
+        name: Wijkagent-Windows
+        path: publish
