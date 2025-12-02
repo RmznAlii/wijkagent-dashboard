@@ -2,35 +2,22 @@
 
 @using WijkAgent.Models
 @using WijkAgent.Services
+@using System.Text.Json
+@using System.Globalization
+@using System.Net.Http
+@using System.Linq
 
 @inject ICrimeService CrimeService
 @inject NavigationManager Nav
 
-@* 
-    EditCrime Page
-    ----------------------
-    Deze pagina laadt één specifiek delict op basis van het Id in de URL.
-    De gebruiker kan hier het delict aanpassen en opslaan.
-    Na opslaan wordt het bijgewerkte delict teruggestuurd naar CrimeService
-    en gaat de gebruiker terug naar Home (waar de kaart + lijst opnieuw laden).
-*@
-
 <h3>Delict bewerken</h3>
 
-@* 
-    Als het delict nog niet geladen is, toon een loading indicator.
-*@
 @if (crime == null)
 {
     <p>Delict wordt geladen...</p>
 }
 else
 {
-    @* 
-        Formulier met bind naar de velden van CrimeModel.
-        Aanpassen in de UI wijzigt direct het 'crime' object.
-    *@
-
     <div class="form-group mb-2">
         <label>Type</label>
         <input class="form-control" @bind="crime.Type" />
@@ -61,36 +48,117 @@ else
 }
 
 @code {
-    // Id uit de URL /editcrime/5
     [Parameter] public int Id { get; set; }
 
-    // Lokaal bewerkbare versie van het delict
     private CrimeModel? crime;
 
     protected override async Task OnInitializedAsync()
     {
-        // 1) Delict ophalen uit de centrale service
-        //    Dit is de "bron van waarheid".
         crime = await CrimeService.GetByIdAsync(Id);
-    }
 
-    private async Task Save()
-    {
-        // 2) Als het delict bestaat, stuur de wijzigingen terug naar de service.
-        if (crime is not null)
+        if (crime is null)
         {
-            await CrimeService.UpdateAsync(crime);
-
-            // 3) Navigeer terug naar de homepage.
-            //    Home laadt automatisch opnieuw alle delicten + tekent de kaart opnieuw.
+            // Geen delict gevonden -> terug naar home
             Nav.NavigateTo("/");
         }
     }
 
+    /// <summary>
+    /// Probeert het adres om te zetten naar Lat/Lng via Nominatim.
+    /// Geeft null terug bij elke fout (geen crash).
+    /// </summary>
+    private async Task<(double lat, double lng)?> GeocodeAddressAsync(string address)
+    {
+        if (string.IsNullOrWhiteSpace(address))
+            return null;
+
+        try
+        {
+            var url =
+                $"https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&q={Uri.EscapeDataString(address)}";
+
+            using var http = new HttpClient();
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+
+            // Nominatim vereist een User-Agent header
+            request.Headers.UserAgent.ParseAdd("wijkagent-app/1.0 (your-email@example.com)");
+
+            var response = await http.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                // Geen succes (bijv. 429, 500, …) -> gewoon null terug
+                Console.WriteLine($"Geocoding HTTP error: {response.StatusCode}");
+                return null;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+
+            using var doc = JsonDocument.Parse(json);
+            var first = doc.RootElement.EnumerateArray().FirstOrDefault();
+
+            if (first.ValueKind != JsonValueKind.Object)
+                return null;
+
+            var latStr = first.GetProperty("lat").GetString();
+            var lngStr = first.GetProperty("lon").GetString();
+
+            if (double.TryParse(latStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var lat) &&
+                double.TryParse(lngStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var lng))
+            {
+                return (lat, lng);
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            // Alle fouten afvangen zodat UI niet crasht
+            Console.WriteLine($"Geocoding failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task Save()
+    {
+        if (crime is null)
+            return;
+
+        // Simpele validatie
+        if (string.IsNullOrWhiteSpace(crime.Type) ||
+            string.IsNullOrWhiteSpace(crime.Description) ||
+            string.IsNullOrWhiteSpace(crime.Address))
+        {
+            return;
+        }
+
+        try
+        {
+            // Probeer nieuwe coördinaten op te halen
+            var coords = await GeocodeAddressAsync(crime.Address);
+
+            if (coords is not null)
+            {
+                crime.Lat = coords.Value.lat;
+                crime.Lng = coords.Value.lng;
+            }
+            // Als coords null is, laten we Lat/Lng zoals ze waren
+        }
+        catch (Exception ex)
+        {
+            // Extra safety, zou eigenlijk niet meer gebeuren door de try/catch hierboven
+            Console.WriteLine($"Error while geocoding in Save(): {ex.Message}");
+        }
+
+        // Updaten in centrale service (dit mag niet falen door geocoding fouten)
+        await CrimeService.UpdateAsync(crime);
+
+        // Terug naar Home (kaart + markers opnieuw)
+        Nav.NavigateTo("/");
+    }
+
     private void Cancel()
     {
-        // Als de gebruiker annuleert, gewoon terug naar Home.
-        // Er worden geen wijzigingen opgeslagen.
         Nav.NavigateTo("/");
     }
 }

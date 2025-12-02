@@ -6,31 +6,16 @@
 
 @implements IDisposable
 
-@*
-    Home Page – Delictenkaart
-    -------------------------
-    - Toont een Leaflet-kaart (JS in wwwroot) met alle delicten.
-    - Formulier rechts om een nieuw delict toe te voegen.
-    - Onder de kaart staat de CrimeList-component met alle delicten.
-    - Data komt altijd uit CrimeService (centrale data-laag).
-*@
-
 <h3>Delictenkaart van Nederland</h3>
 
 <div class="row">
     <div class="col-md-8">
-        @* Container waar de JS-map (Leaflet) in wordt gerenderd *@
         <div id="crimeMap" style="height:600px; width:100%; border-radius:8px;"></div>
     </div>
 
     <div class="col-md-4">
         <h5>Nieuw delict toevoegen</h5>
 
-        @* 
-            Adresvelden.
-            Bij elke wijziging in een adresveld wordt ClearLatLng() aangeroepen,
-            zodat oude coördinaten ongeldig worden (geforceerd opnieuw zoeken).
-        *@
         <div class="mb-2">
             <label>Straat</label>
             <input type="text" class="form-control" @bind="street" @oninput="(_) => ClearLatLng()" />
@@ -73,13 +58,8 @@
         </div>
 
         <div class="mt-2">
-            @* Roept JS aan om coördinaten te zoeken op basis van adres *@
             <button class="btn btn-outline-primary" @onclick="PlacePin">Zoek adres</button>
-
-            @* Voegt een nieuw delict toe (service + kaart + lijst) *@
             <button class="btn btn-primary ms-2" @onclick="AddCrime">Delict toevoegen</button>
-
-            @* Verwijdert alle delicten (service + kaart + lijst) *@
             <button class="btn btn-secondary ms-2" @onclick="ClearCrimes">Alles verwijderen</button>
         </div>
     </div>
@@ -88,20 +68,18 @@
 <div class="row mt-4">
     <div class="col-md-12">
         <h5>Overzicht van delicten</h5>
-        @* Herbruikbaar component met bewerken/verwijderen-knoppen *@
         <CrimeList Crimes="@crimes" />
     </div>
 </div>
 
 @code {
-    // Lokale lijst van delicten voor de UI (bron = CrimeService)
+    // Data
     private List<CrimeModel> crimes = new();
 
-    // Laatst gekozen of gegeocodeerde coördinaten
+    // Laatst gekozen / gegeocodeerde coördinaten voor het formulier
     private double lat;
     private double lng;
 
-    // Formuliervelden voor het nieuwe delict
     private string street = "";
     private string houseNumber = "";
     private string postcode = "";
@@ -111,28 +89,46 @@
     private string description = "";
     private DateTime incidentDateTime = DateTime.Now;
 
-    // Nodig voor JS interop: C#-object dat vanuit JS aangeroepen kan worden
+    // JS interop
     private DotNetObjectReference<Home>? objRef;
+    private bool _mapInitialized = false;
+    private bool _needsMarkerRefresh = false;
 
-    /// <summary>
-    /// Lifecycle-methode van Blazor.
-    /// Wordt aangeroepen nadat de component is gerenderd.
-    /// </summary>
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    // 1) Elke keer als je naar "/" navigeert (ook na bewerken)
+    protected override async Task OnParametersSetAsync()
     {
-        if (!firstRender) return;
-
-        // 1) DotNet helper registreren zodat JS C# kan aanroepen (MapClicked).
-        objRef = DotNetObjectReference.Create(this);
-
-        // 2) Kaart initialiseren in JS (Leaflet) en helper instellen.
-        await JS.InvokeVoidAsync("initCrimeMap");
-        await JS.InvokeVoidAsync("setDotNetHelper", objRef);
-
-        // 3) Bestaande delicten uit de service laden...
+        // Altijd nieuwste data uit service halen
         crimes = await CrimeService.GetAllAsync();
 
-        // ...en voor elk delict een marker op de kaart tekenen.
+        // Geef aan dat markers opnieuw getekend moeten worden
+        _needsMarkerRefresh = true;
+    }
+
+    // 2) Lifecycle: kaart één keer initialiseren, en daarna markers tekenen als nodig
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+
+            await JS.InvokeVoidAsync("initCrimeMap");
+            await JS.InvokeVoidAsync("setDotNetHelper", objRef);
+
+            _mapInitialized = true;
+        }
+
+        if (_mapInitialized && _needsMarkerRefresh)
+        {
+            _needsMarkerRefresh = false;
+            await RedrawMarkersAsync();
+        }
+    }
+
+    // 3) Helpers: markers wissen en opnieuw tekenen
+    private async Task RedrawMarkersAsync()
+    {
+        await JS.InvokeVoidAsync("clearCrimes");
+
         foreach (var crime in crimes)
         {
             string info =
@@ -140,15 +136,9 @@
 
             await JS.InvokeVoidAsync("addCrime", crime.Lat, crime.Lng, info, crime.Type);
         }
-
-        StateHasChanged();
     }
 
-    /// <summary>
-    /// Wordt vanuit JavaScript aangeroepen.
-    /// JS geeft de coördinaten + adresgegevens door als de gebruiker
-    /// op de kaart klikt of als geocoding is voltooid.
-    /// </summary>
+    // Wordt vanuit JS aangeroepen bij klik / geocoding
     [JSInvokable]
     public void MapClicked(double clickedLat, double clickedLng,
         string clickedPostcode, string clickedCity, string clickedProvince,
@@ -165,26 +155,16 @@
         StateHasChanged();
     }
 
-    /// <summary>
-    /// Vraagt in JS om op basis van adres een pin te plaatsen
-    /// (geocoding gebeurt in de JS-laag).
-    /// </summary>
     private async Task PlacePin()
     {
         await JS.InvokeVoidAsync("placePinByAddress", street, houseNumber, postcode, city, province);
     }
 
-    /// <summary>
-    /// Maakt een nieuw delict aan op basis van formulier + coördinaten.
-    /// Slaat het op in CrimeService, update de UI-lijst en tekent een marker op de kaart.
-    /// </summary>
     private async Task AddCrime()
     {
-        // Minimale validatie: type en omschrijving verplicht.
         if (string.IsNullOrWhiteSpace(description) || string.IsNullOrWhiteSpace(type))
             return;
 
-        // We eisen dat er coördinaten zijn (geklikt op kaart of gegeocodeerd).
         if (lat == 0 && lng == 0)
             return;
 
@@ -200,55 +180,33 @@
             Lng = lng
         };
 
-        // 1) Opslaan in de centrale service (bron van waarheid).
         await CrimeService.AddAsync(newCrime);
 
-        // 2) Lijst opnieuw ophalen zodat UI synchroon is met de service.
+        // Data opnieuw laden + markers verversen
         crimes = await CrimeService.GetAllAsync();
+        _needsMarkerRefresh = true;
+        StateHasChanged();
 
-        // 3) Marker op de kaart tekenen voor het nieuwe delict.
-        string info =
-            $"{newCrime.Type}, {newCrime.Description} — {newCrime.DateTimeString} <br/> ({newCrime.Address})";
-
-        await JS.InvokeVoidAsync("addCrime", newCrime.Lat, newCrime.Lng, info, newCrime.Type);
-
-        // 4) Formulier resetten voor de volgende invoer.
         description = "";
         type = "";
         incidentDateTime = DateTime.Now;
-
-        StateHasChanged();
     }
 
-    /// <summary>
-    /// Verwijdert alle delicten:
-    /// - uit CrimeService (data)
-    /// - uit de lokale lijst (UI)
-    /// - van de kaart (JS markers)
-    /// </summary>
     private async Task ClearCrimes()
     {
-        await CrimeService.ClearAsync();   // data laag leeg
-        crimes.Clear();                    // UI-lijst leeg
-        await JS.InvokeVoidAsync("clearCrimes"); // kaart markers leeg
+        await CrimeService.ClearAsync();
+        crimes.Clear();
 
+        _needsMarkerRefresh = true;
         StateHasChanged();
     }
 
-    /// <summary>
-    /// Als het adres wordt aangepast, zijn oude coördinaten niet meer geldig.
-    /// Daarom resetten we lat/lng zodat de gebruiker opnieuw een adres/kaartactie moet doen.
-    /// </summary>
     private void ClearLatLng()
     {
         lat = 0;
         lng = 0;
     }
 
-    /// <summary>
-    /// Opruimen van resources.
-    /// Nodig omdat we DotNetObjectReference gebruiken voor JS interop.
-    /// </summary>
     public void Dispose()
     {
         objRef?.Dispose();
