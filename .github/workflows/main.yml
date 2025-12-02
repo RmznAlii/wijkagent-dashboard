@@ -1,4 +1,4 @@
-name: MAUI Blazor CI
+name: .NET MAUI build
 
 on:
   push:
@@ -15,31 +15,22 @@ jobs:
         configuration: [ Debug, Release ]
 
     env:
-      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      SOLUTION_FILE: wijkagent/WijkAgent.sln
 
     steps:
-      # 1. Code ophalen
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      # 2. .NET SDK installeren (pas aan als je een andere versie gebruikt)
       - name: Install .NET SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
 
-      # 3. MAUI workload installeren (nodig voor MAUI-projecten)
       - name: Install .NET MAUI workload
         run: dotnet workload install maui
 
-      # 4. Restore in de map waar WijkAgent.sln staat
       - name: Restore solution
-        working-directory: wijkagent
-        run: dotnet restore WijkAgent.sln
+        run: dotnet restore $env:SOLUTION_FILE
 
-      # 5. Build (Debug / Release via matrix)
       - name: Build solution
-        working-directory: wijkagent
-        run: dotnet build WijkAgent.sln -c ${{ matrix.configuration }} --no-restore
+        run: dotnet build $env:SOLUTION_FILE --configuration ${{ matrix.configuration }} --no-restore
