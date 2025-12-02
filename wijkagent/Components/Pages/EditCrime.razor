@@ -1,0 +1,96 @@
+@page "/editcrime/{Id:int}"
+
+@using WijkAgent.Models
+@using WijkAgent.Services
+
+@inject ICrimeService CrimeService
+@inject NavigationManager Nav
+
+@* 
+    EditCrime Page
+    ----------------------
+    Deze pagina laadt één specifiek delict op basis van het Id in de URL.
+    De gebruiker kan hier het delict aanpassen en opslaan.
+    Na opslaan wordt het bijgewerkte delict teruggestuurd naar CrimeService
+    en gaat de gebruiker terug naar Home (waar de kaart + lijst opnieuw laden).
+*@
+
+<h3>Delict bewerken</h3>
+
+@* 
+    Als het delict nog niet geladen is, toon een loading indicator.
+*@
+@if (crime == null)
+{
+    <p>Delict wordt geladen...</p>
+}
+else
+{
+    @* 
+        Formulier met bind naar de velden van CrimeModel.
+        Aanpassen in de UI wijzigt direct het 'crime' object.
+    *@
+
+    <div class="form-group mb-2">
+        <label>Type</label>
+        <input class="form-control" @bind="crime.Type" />
+    </div>
+
+    <div class="form-group mb-2">
+        <label>Beschrijving</label>
+        <textarea class="form-control" @bind="crime.Description"></textarea>
+    </div>
+
+    <div class="form-group mb-2">
+        <label>Adres</label>
+        <input class="form-control" @bind="crime.Address" />
+    </div>
+
+    <div class="form-group mb-2">
+        <label>Datum/tijd</label>
+        <input class="form-control" @bind="crime.DateTimeString" />
+    </div>
+
+    <button class="btn btn-success mt-3 me-2" @onclick="Save">
+        Opslaan
+    </button>
+
+    <button class="btn btn-secondary mt-3" @onclick="Cancel">
+        Annuleren
+    </button>
+}
+
+@code {
+    // Id uit de URL /editcrime/5
+    [Parameter] public int Id { get; set; }
+
+    // Lokaal bewerkbare versie van het delict
+    private CrimeModel? crime;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 1) Delict ophalen uit de centrale service
+        //    Dit is de "bron van waarheid".
+        crime = await CrimeService.GetByIdAsync(Id);
+    }
+
+    private async Task Save()
+    {
+        // 2) Als het delict bestaat, stuur de wijzigingen terug naar de service.
+        if (crime is not null)
+        {
+            await CrimeService.UpdateAsync(crime);
+
+            // 3) Navigeer terug naar de homepage.
+            //    Home laadt automatisch opnieuw alle delicten + tekent de kaart opnieuw.
+            Nav.NavigateTo("/");
+        }
+    }
+
+    private void Cancel()
+    {
+        // Als de gebruiker annuleert, gewoon terug naar Home.
+        // Er worden geen wijzigingen opgeslagen.
+        Nav.NavigateTo("/");
+    }
+}
