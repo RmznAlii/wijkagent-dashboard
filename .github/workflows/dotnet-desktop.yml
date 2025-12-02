@@ -15,34 +15,27 @@ jobs:
         configuration: [ Debug, Release ]
 
     env:
-      # Pas dit aan als je .sln ergens anders staat
-      Solution_Name: Wijkagent/Wijkagent.sln
+      Solution_Name: wijkagent/WijkAgent.sln
 
     steps:
-      # 1. Code ophalen
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. .NET 8 SDK installeren
       - name: Install .NET SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
 
-      # 3. MSBuild beschikbaar maken (voor .sln build)
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      # 4. Restore (packages binnenhalen)
       - name: Restore
         run: msbuild $env:Solution_Name /t:Restore /p:Configuration=${{ matrix.configuration }}
 
-      # 5. Build
       - name: Build
         run: msbuild $env:Solution_Name /p:Configuration=${{ matrix.configuration }}
 
-      # 6. Tests draaien
       - name: Test
         run: dotnet test
