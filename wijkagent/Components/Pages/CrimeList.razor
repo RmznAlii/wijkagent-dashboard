@@ -1,14 +1,69 @@
 @using WijkAgent.Models
+@using WijkAgent.Services
+@inject NavigationManager Nav
+@inject ICrimeService CrimeService
 
-@foreach (var crime in Crimes)
+@* 
+    CrimeList Component
+    --------------------
+    Dit component toont een lijst met delicten.
+    Het ontvangt de lijst via [Parameter] vanuit de oudercomponent (bijv. Home.razor).
+    Hier worden ook de bewerk/verwijder-acties afgehandeld.
+*@
+
+@if (Crimes == null || Crimes.Count == 0)
 {
-    <div class="card mb-2 p-2 shadow-sm">
-        <b>@crime.Type</b> – @crime.Description <br />
-        <small>@crime.DateTimeString</small><br />
-        <small>@crime.Address</small>
-    </div>
+    <p>Geen delicten gevonden.</p>
+}
+else
+{
+    @foreach (var crime in Crimes)
+    {
+        <div class="card mb-2 p-2 shadow-sm">
+            <b>@crime.Type</b> – @crime.Description <br />
+            <small>@crime.DateTimeString</small><br />
+            <small>@crime.Address</small>
+
+            <div class="mt-2 d-flex gap-2">
+                @* Navigatie naar bewerkpagina *@
+                <button class="btn btn-primary btn-sm"
+                        @onclick="() => EditCrime(crime.Id)">
+                    Bewerken
+                </button>
+
+                @* Verwijdert delict uit service + UI *@
+                <button class="btn btn-danger btn-sm"
+                        @onclick="() => DeleteCrime(crime.Id)">
+                    Verwijderen
+                </button>
+            </div>
+        </div>
+    }
 }
 
 @code {
+    // De lijst delicten wordt door de ouder (bijv. Home.razor) doorgegeven.
     [Parameter] public List<CrimeModel> Crimes { get; set; } = new();
+
+    // Navigatie naar de Edit-pagina voor een specifiek delict.
+    private void EditCrime(int id)
+    {
+        Nav.NavigateTo($"/editcrime/{id}");
+    }
+
+    // Verwijdert een delict zowel uit de service (centrale data)
+    // als uit de lokale UI-lijst zodat de UI meteen ververst.
+    private async Task DeleteCrime(int id)
+    {
+        // verwijder uit centrale opslag (CrimeService)
+        await CrimeService.DeleteAsync(id);
+
+        // verwijder uit de lijst die op het scherm staat
+        var toRemove = Crimes.FirstOrDefault(c => c.Id == id);
+        if (toRemove != null)
+        {
+            Crimes.Remove(toRemove);
+            StateHasChanged(); // UI direct updaten
+        }
+    }
 }
