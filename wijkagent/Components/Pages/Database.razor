@@ -1,0 +1,82 @@
+﻿@page "/database"
+@using WijkAgent.Models
+@using WijkAgent.Data
+@using Microsoft.EntityFrameworkCore
+@inject WijkAgentDbContext Db
+
+<h3>Alle delicten in de database</h3>
+
+<div class="mb-3">
+    <label>Filter op type delict:</label>
+    <select class="form-control w-25" @bind="SelectedFilterType">
+        <option value="">Alles</option>
+        <option value="Diefstal">Diefstal</option>
+        <option value="Vandalisme">Vandalisme</option>
+        <option value="Overlast">Overlast</option>
+    </select>
+</div>
+
+@if (crimes == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <p>Aantal delicten: @crimes.Count</p>
+    <table class="table table-striped">
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Type</th>
+            <th>Omschrijving</th>
+            <th>Adres</th>
+            <th>Lat / Lng</th>
+            <th>Tijd</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var c in crimes)
+        {
+            <tr>
+                <td>@c.Id</td>
+                <td>@c.Type</td>
+                <td>@c.Description</td>
+                <td>@c.Street @c.HouseNumber, @c.Postcode @c.City, @c.Province</td>
+                <td>@c.Lat, @c.Lng</td>
+                <td>@c.IncidentDateTime.ToString("dd-MM-yyyy HH:mm")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Crime>? crimes;
+    private List<Crime>? allCrimes;
+
+    private string selectedFilterType = "";
+
+    // Property voor binding en filter
+    private string SelectedFilterType
+    {
+        get => selectedFilterType;
+        set
+        {
+            selectedFilterType = value;
+            FilterCrimes();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        allCrimes = await Db.Crimes.OrderByDescending(c => c.CreatedAt).ToListAsync();
+        FilterCrimes();
+    }
+
+    private void FilterCrimes()
+    {
+        crimes = string.IsNullOrEmpty(selectedFilterType)
+            ? allCrimes
+            : allCrimes?.Where(c => c.Type == selectedFilterType).ToList();
+    }
+}

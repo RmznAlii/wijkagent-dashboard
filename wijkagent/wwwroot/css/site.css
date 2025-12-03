@@ -1,0 +1,78 @@
+/* Politie stijl */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f6f8;
+    margin: 0;
+    padding: 0;
+}
+
+/* Header / navbar */
+.navbar {
+    background-color: #0B4C8C;
+    color: white;
+    padding: 0.5rem 1rem;
+}
+
+.navbar a {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.navbar a:hover {
+    color: #FFD700; /* licht goud voor hover */
+}
+
+/* Kaart container */
+#crimeMap {
+    border-radius: 8px;
+    border: 2px solid #0B4C8C;
+}
+
+/* Form styling */
+.form-control {
+    border-radius: 5px;
+    border: 1px solid #0B4C8C;
+}
+
+/* Buttons */
+.btn-primary {
+    background-color: #0B4C8C;
+    border-color: #0B4C8C;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #08335a;
+    border-color: #08335a;
+}
+
+/* Table styling */
+.table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: #e7f0fa;
+}
+
+.table th {
+    background-color: #0B4C8C;
+    color: white;
+}
+
+/* Collapsible section */
+.collapse-header {
+    background-color: #0B4C8C;
+    color: white;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+.collapse-body {
+    padding: 0.5rem 0;
+}
+
+/* Logo */
+.header-logo {
+    height: 50px;
+    width: auto;
+}
+
