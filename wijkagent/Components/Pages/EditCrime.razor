@@ -9,7 +9,14 @@
 
 @inject ICrimeService CrimeService
 @inject NavigationManager Nav
-
+@* 
+    EditCrime Page
+    ----------------------
+    Deze pagina laadt één specifiek delict op basis van het Id in de URL.
+    De gebruiker kan hier het delict aanpassen en opslaan.
+    Na opslaan wordt het bijgewerkte delict teruggestuurd naar CrimeService
+    en gaat de gebruiker terug naar Home (waar de kaart + lijst opnieuw laden).
+*@
 <h3>Delict bewerken</h3>
 
 @if (crime == null)
@@ -87,7 +94,7 @@ else
 
             if (!response.IsSuccessStatusCode)
             {
-                // Geen succes (bijv. 429, 500, …) -> gewoon null terug
+                // Geen succes (bijv. 429, 500, …) gewoon null terug
                 Console.WriteLine($"Geocoding HTTP error: {response.StatusCode}");
                 return null;
             }
@@ -150,7 +157,7 @@ else
             Console.WriteLine($"Error while geocoding in Save(): {ex.Message}");
         }
 
-        // Updaten in centrale service (dit mag niet falen door geocoding fouten)
+        // Updaten in centrale service 
         await CrimeService.UpdateAsync(crime);
 
         // Terug naar Home (kaart + markers opnieuw)
