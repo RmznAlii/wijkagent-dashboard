@@ -2,17 +2,36 @@ using WijkAgent.Models;
 
 namespace WijkAgent.Services;
 
+/// <summary>
+/// In-memory implementatie van <see cref="ICrimeService"/>.
+/// Beheert delicten zonder database en biedt CRUD-functionaliteit.
+/// </summary>
 public class CrimeService : ICrimeService
 {
+    /// <summary>
+    /// Interne lijst waarin alle delicten worden opgeslagen.
+    /// </summary>
     private readonly List<CrimeModel> _crimes = new();
+
+    /// <summary>
+    /// Voorkomt dat seeding meerdere keren wordt uitgevoerd.
+    /// </summary>
     private bool _isSeeded;
 
+    /// <summary>
+    /// Haalt alle delicten op uit de in-memory lijst.
+    /// </summary>
     public Task<List<CrimeModel>> GetAllAsync()
     {
         EnsureSeeded();
         return Task.FromResult(_crimes.ToList());
     }
 
+    /// <summary>
+    /// Haalt één delict op basis van het meegegeven ID.
+    /// </summary>
+    /// <param name="id">Het ID van het gezochte delict.</param>
+    /// <returns>Het gevonden <see cref="CrimeModel"/> of null.</returns>
     public Task<CrimeModel?> GetByIdAsync(int id)
     {
         EnsureSeeded();
@@ -20,6 +39,11 @@ public class CrimeService : ICrimeService
         return Task.FromResult(crime);
     }
 
+    /// <summary>
+    /// Voegt een nieuw delict toe aan de lijst.
+    /// Wijs automatisch een nieuwe ID toe
+    /// </summary>
+    /// <param name="crime">Het nieuwe delict dat toegevoegd moet worden.</param>
     public Task AddAsync(CrimeModel crime)
     {
         EnsureSeeded();
@@ -30,6 +54,10 @@ public class CrimeService : ICrimeService
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Werk een bestaand delict bij. Alleen velden worden overschreven.
+    /// </summary>
+    /// <param name="crime">Het aangepaste delictmodel met bestaande ID.</param>
     public Task UpdateAsync(CrimeModel crime)
     {
         EnsureSeeded();
@@ -47,6 +75,10 @@ public class CrimeService : ICrimeService
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Verwijdert een delict op basis van ID.
+    /// </summary>
+    /// <param name="id">Het ID van het delict dat verwijderd moet worden.</param>
     public Task DeleteAsync(int id)
     {
         EnsureSeeded();
@@ -58,42 +90,25 @@ public class CrimeService : ICrimeService
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Verwijdert alle delicten uit de lijst.
+    /// </summary>
     public Task ClearAsync()
     {
-        // lijst leegmaken, maar NIET opnieuw seeden
         _crimes.Clear();
-        _isSeeded = true; // voorkomt opnieuw seeden
+        _isSeeded = true; // voorkomt dat er opnieuw standaarddata wordt toegevoegd
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Wordt gebruikt om eenmalig standaarddata te laden.
+    /// In deze implementatie is seeding uitgeschakeld.
+    /// </summary>
     private void EnsureSeeded()
     {
         if (_isSeeded) return;
 
-        _crimes.AddRange(new[]
-        {
-            new CrimeModel
-            {
-                Id = 1,
-                Type = "Diefstal",
-                Description = "Fiets gestolen bij station",
-                Address = "Stationsplein 1",
-                DateTimeString = "2025-12-01 14:30",
-                Lat = 52.307,
-                Lng = 5.040
-            },
-            new CrimeModel
-            {
-                Id = 2,
-                Type = "Vernieling",
-                Description = "Ruit ingegooid",
-                Address = "Hoofdstraat 12",
-                DateTimeString = "2025-12-01 18:10",
-                Lat = 52.308,
-                Lng = 5.042
-            }
-        });
-
+        // Geen standaard delicten toevoegen
         _isSeeded = true;
     }
 }
