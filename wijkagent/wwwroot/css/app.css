@@ -1,7 +1,4 @@
-﻿/* =========================
-   Pagina layout
-   ========================= */
-.page {
+﻿.page {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
@@ -14,16 +11,13 @@ main {
     background-color: #f5f5f5;
 }
 
-/* =========================
-   Top navbar
-   ========================= */
 .top-row {
     display: flex;
     align-items: center;
     justify-content: flex-start;
     height: 3.5rem;
-    background-color: #0B4C8C; /* Politie-blauw */
-    border-bottom: 2px solid #FFD700; /* Gouden accent */
+    background-color: #0B4C8C;
+    border-bottom: 2px solid #FFD700;
     padding: 0 1.5rem;
     color: white;
 }
@@ -35,7 +29,6 @@ main {
     margin-right: 2rem;
 }
 
-/* Nav links */
 .nav-scrollable nav {
     display: flex;
     flex-direction: row;
@@ -57,16 +50,15 @@ main {
 }
 
 .nav-item ::deep a:hover {
-    background-color: rgba(11,76,140,0.8); /* Donkerblauw hover */
+    background-color: rgba(11,76,140,0.8);
     color: white !important;
 }
 
 .nav-item ::deep a.active {
-    background-color: #FFD700; /* Gouden accent */
-    color: #0B4C8C !important; /* Politie-blauw tekst */
+    background-color: #FFD700;
+    color: #0B4C8C !important;
 }
 
-/* Icons */
 .bi {
     margin-right: 0.5rem;
     width: 1.2rem;
@@ -75,7 +67,6 @@ main {
     background-size: cover;
 }
 
-/* Pagina content */
 article {
     background-color: white;
     border-radius: 8px;
@@ -84,7 +75,6 @@ article {
     margin-top: 1rem;
 }
 
-/* Geen witruimte links van pagina */
 main {
     margin-left: 0 !important;
 }

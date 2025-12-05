@@ -71,4 +71,8 @@
       <Content Include=".github\workflows\main.yml" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Services\" />
+    </ItemGroup>
+
 </Project>
