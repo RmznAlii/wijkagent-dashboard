@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using WijkAgent.Data;
+using WijkAgent.Services;
 
 namespace WijkAgent;
 
@@ -18,11 +19,12 @@ public static class MauiProgram
 
         builder.Services.AddMauiBlazorWebView();
 
-        // ✅ Voeg DbContext voor MySQL toe
         var connectionString = "server=127.0.0.1;database=wijkagent;user=root;password=;";
         builder.Services.AddDbContext<WijkAgentDbContext>(options =>
             options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))
         );
+        
+        builder.Services.AddScoped<ICrimeService, CrimeService>();
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();

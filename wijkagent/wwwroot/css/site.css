@@ -1,4 +1,3 @@
-/* Politie stijl */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f4f6f8;
@@ -6,7 +5,6 @@ body {
     padding: 0;
 }
 
-/* Header / navbar */
 .navbar {
     background-color: #0B4C8C;
     color: white;
@@ -20,26 +18,48 @@ body {
 }
 
 .navbar a:hover {
-    color: #FFD700; /* licht goud voor hover */
+    color: #FFD700;
 }
 
-/* Kaart container */
+.politie-logo-bar {
+    padding: 0.5rem 0;
+}
+
+.header-logo {
+    height: 50px;
+    width: auto;
+}
+
+.navbar .header-logo {
+    height: 40px;
+    width: auto;
+}
+
 #crimeMap {
     border-radius: 8px;
     border: 2px solid #0B4C8C;
 }
 
-/* Form styling */
+.new-crime-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #0B4C8C;
+    margin-bottom: 0.75rem;
+}
+
 .form-control {
     border-radius: 5px;
     border: 1px solid #0B4C8C;
 }
 
-/* Buttons */
+.btn {
+    border-radius: 0 !important;
+}
+
 .btn-primary {
     background-color: #0B4C8C;
     border-color: #0B4C8C;
-    color: white;
+    color: #fff;
 }
 
 .btn-primary:hover {
@@ -47,7 +67,6 @@ body {
     border-color: #08335a;
 }
 
-/* Table styling */
 .table-striped > tbody > tr:nth-of-type(odd) {
     background-color: #e7f0fa;
 }
@@ -57,7 +76,6 @@ body {
     color: white;
 }
 
-/* Collapsible section */
 .collapse-header {
     background-color: #0B4C8C;
     color: white;
@@ -70,9 +88,149 @@ body {
     padding: 0.5rem 0;
 }
 
-/* Logo */
-.header-logo {
-    height: 50px;
-    width: auto;
+.home-tabs {
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
 }
 
+.home-tab-btn {
+    border-radius: 0 !important;
+    padding: 0.35rem 1.25rem;
+    font-weight: 500;
+    border: 1px solid #0B4C8C;
+    background-color: #fff;
+    color: #0B4C8C;
+    cursor: pointer;
+}
+
+.home-tab-btn + .home-tab-btn {
+    margin-left: 0.5rem;
+}
+
+.home-tab-btn.active-tab {
+    background-color: #0B4C8C;
+    color: #fff;
+}
+
+.delict-card {
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background-color: #fff;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    max-width: 720px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.delict-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.delict-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #0B4C8C;
+}
+
+.delict-edit-btn {
+    border-radius: 0 !important;
+    padding: 0.25rem 0.85rem;
+    font-size: 0.9rem;
+    border: 1px solid #ff7a1a;
+    background-color: #fff;
+    color: #ff7a1a;
+    cursor: pointer;
+}
+
+.delict-edit-btn:hover {
+    background-color: #ff7a1a;
+    color: #fff;
+}
+
+.filter-card {
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background-color: #fff;
+    padding: 1.25rem 1.5rem;
+    margin-top: 0.75rem;
+    max-width: 720px;
+}
+
+.filter-card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #0B4C8C;
+    margin-bottom: 1rem;
+}
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
+    column-gap: 1.5rem;
+    row-gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+    .filter-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.filter-card label {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.filter-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.filter-actions .btn {
+    min-width: 130px;
+    border-radius: 0 !important;
+}
+
+.filter-actions .btn + .btn {
+    margin-top: 0.25rem;
+}
+
+.btn-filter-cancel {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: #fff;
+}
+
+.btn-filter-cancel:hover {
+    background-color: #5c636a;
+    border-color: #565e64;
+}
+
+.btn-filter-apply {
+    background-color: #0B4C8C;
+    border-color: #0B4C8C;
+    color: #fff;
+}
+
+.btn-filter-apply:hover {
+    background-color: #08335a;
+    border-color: #08335a;
+}
+
+input[type="datetime-local"] {
+    width: 100% !important;
+    max-width: 297px;
+    box-sizing: border-box;
+}
+
+.form-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #0B4C8C;
+    margin-bottom: 1rem;
+}

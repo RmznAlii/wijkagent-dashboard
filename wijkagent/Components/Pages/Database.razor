@@ -1,11 +1,19 @@
 ﻿@page "/database"
 @using WijkAgent.Models
-@using WijkAgent.Data
-@using Microsoft.EntityFrameworkCore
-@inject WijkAgentDbContext Db
+@using WijkAgent.Services
+@inject ICrimeService CrimeService
+
+@* =====================================================
+   PAGINA: Database-overzicht van alle delicten
+   Doel:
+   - Toont alle delicten in een tabelvorm.
+   - Biedt een eenvoudige filter op type delict (Diefstal, Vandalisme, Overlast).
+   - Data wordt opgehaald via CrimeService (centrale data-laag).
+   ===================================================== *@
 
 <h3>Alle delicten in de database</h3>
 
+@* Filter-sectie: gebruiker kan lijst beperken op type delict *@
 <div class="mb-3">
     <label>Filter op type delict:</label>
     <select class="form-control w-25" @bind="SelectedFilterType">
@@ -16,6 +24,7 @@
     </select>
 </div>
 
+@* Tabel-sectie: toont aantal delicten + details in tabel *@
 @if (crimes == null)
 {
     <p>Loading...</p>
@@ -51,12 +60,25 @@ else
 }
 
 @code {
+    // ==============================================
+    // STATE: DATA UIT DE DATABASE
+    // - allCrimes: volledige lijst uit CrimeService
+    // - crimes: gefilterde lijst die op het scherm staat
+    // ==============================================
     private List<Crime>? crimes;
     private List<Crime>? allCrimes;
 
+    // ==============================================
+    // STATE: GEKOZEN FILTERTYPE
+    // - SelectedFilterType triggert direct FilterCrimes()
+    // ==============================================
     private string selectedFilterType = "";
 
-    // Property voor binding en filter
+    /// <summary>
+    /// Eigenschap gekoppeld aan de dropdown in de UI.
+    /// Bij wijziging wordt automatisch FilterCrimes() aangeroepen
+    /// om de tabel te verversen op basis van het gekozen type.
+    /// </summary>
     private string SelectedFilterType
     {
         get => selectedFilterType;
@@ -67,12 +89,22 @@ else
         }
     }
 
+    /// <summary>
+    /// Wordt eenmalig aangeroepen bij het laden van de pagina.
+    /// Haalt alle delicten op via CrimeService en vult daarna de
+    /// zichtbare lijst (crimes) via FilterCrimes().
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
-        allCrimes = await Db.Crimes.OrderByDescending(c => c.CreatedAt).ToListAsync();
+        allCrimes = await CrimeService.GetAllAsync();
         FilterCrimes();
     }
 
+    /// <summary>
+    /// Past filter toe op allCrimes op basis van selectedFilterType.
+    /// - Als geen type gekozen is, toont de pagina alle delicten.
+    /// - Anders worden alleen delicten met dat type getoond.
+    /// </summary>
     private void FilterCrimes()
     {
         crimes = string.IsNullOrEmpty(selectedFilterType)

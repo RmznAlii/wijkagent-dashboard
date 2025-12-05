@@ -1,30 +1,70 @@
 ﻿@page "/"
-@using Microsoft.EntityFrameworkCore
+
 @using WijkAgent.Models
-@using WijkAgent.Data
-@inject WijkAgentDbContext Db
+@using WijkAgent.Services
+@inject ICrimeService CrimeService
 @inject IJSRuntime JS
 
-<div class="navbar d-flex align-items-center mb-3">
-    <img src="images/politie.svg" class="header-logo me-2" style="height:50px;" />
+@implements IDisposable
+
+@* ============================================
+   PAGINA: Delictenkaart van Nederland (Home)
+   Doel:
+   - Kaart tonen met alle delicten (Leaflet via JS).
+   - Formulier rechts om delicten toe te voegen/bewerken.
+   - Onder de kaart: tabblad Overzicht of Filters.
+   - Alle data loopt via CrimeService (DB-laag).
+   ============================================ *@
+
+<!-- Smalle balk onder de hoofdnavigatie voor het logo -->
+<div class="politie-logo-bar d-flex align-items-center mb-3">
+    <img src="images/politie.svg" class="header-logo me-2" />
 </div>
 
 <h3>Delictenkaart van Nederland</h3>
 
+@* ============================================
+   HOOFDSECTIE: KAART + FORMULIER
+   - Links: Leaflet-kaart (JS rendert in #crimeMap)
+   - Rechts: formulier voor nieuw delict of bewerken
+   ============================================ *@
 <div class="row">
+    <!-- Kaart links -->
     <div class="col-md-8">
         <div id="crimeMap" style="height:600px; width:100%; border-radius:8px;"></div>
     </div>
 
+    <!-- Nieuw delict / Delict bewerken formulier rechts -->
     <div class="col-md-4">
-        <h5>Nieuw delict toevoegen</h5>
+        <h5 class="form-title">
+            @(isEditing ? "Delict bewerken" : "Nieuw delict toevoegen")
+        </h5>
 
-        <div class="mb-2"><label>Straat</label><input class="form-control" @bind="street"/></div>
-        <div class="mb-2"><label>Huisnummer</label><input class="form-control" @bind="houseNumber"/></div>
-        <div class="mb-2"><label>Postcode</label><input class="form-control" @bind="postcode"/></div>
-        <div class="mb-2"><label>Stad</label><input class="form-control" @bind="city"/></div>
-        <div class="mb-2"><label>Provincie</label><input class="form-control" @bind="province"/></div>
-        <div class="mb-2"><label>Datum en tijd</label><input type="datetime-local" class="form-control" @bind="incidentDateTime"/></div>
+        @* Adresgegevens + delictgegevens *@
+        <div class="mb-2">
+            <label>Straat</label>
+            <input class="form-control" @bind="street" />
+        </div>
+        <div class="mb-2">
+            <label>Huisnummer</label>
+            <input class="form-control" @bind="houseNumber" />
+        </div>
+        <div class="mb-2">
+            <label>Postcode</label>
+            <input class="form-control" @bind="postcode" />
+        </div>
+        <div class="mb-2">
+            <label>Stad</label>
+            <input class="form-control" @bind="city" />
+        </div>
+        <div class="mb-2">
+            <label>Provincie</label>
+            <input class="form-control" @bind="province" />
+        </div>
+        <div class="mb-2">
+            <label>Datum en tijd</label>
+            <input type="datetime-local" class="form-control" @bind="incidentDateTime" />
+        </div>
         <div class="mb-2">
             <label>Type</label>
             <select class="form-control" @bind="type">
@@ -34,137 +74,330 @@
                 <option value="Overlast">Overlast</option>
             </select>
         </div>
-        <div class="mb-2"><label>Omschrijving</label><input class="form-control" @bind="description"/></div>
-
-        <div class="mt-2">
-            <button class="btn btn-outline-primary" @onclick="PlacePin">Zoek adres</button>
-            <button class="btn btn-primary ms-2" @onclick="AddCrime">Delict toevoegen</button>
+        <div class="mb-2">
+            <label>Omschrijving</label>
+            <input class="form-control" @bind="description" />
         </div>
+
+        @* Actieknoppen bij formulier *@
+        <div class="mt-2">
+
+            <button class="btn btn-outline-primary" @onclick="PlacePin">
+                Zoek adres
+            </button>
+
+            <button class="btn btn-danger ms-2" @onclick="ResetForm">
+                Alles wissen
+            </button>
+
+            @if (isEditing)
+            {
+                <button class="btn btn-secondary ms-2" @onclick="CancelEdit">
+                    Annuleren
+                </button>
+            }
+
+            <button class="btn btn-primary ms-2" @onclick="SubmitCrime">
+                @(isEditing ? "Delict bewerken" : "Delict toevoegen")
+            </button>
+
+        </div>
+
     </div>
 </div>
 
-<hr/>
+@* ============================================
+   ONDERKAART: OVERZICHT vs FILTERS (TABBLADEN)
+   - Overzicht: details van geselecteerd delict
+   - Filters: filter op datum, type, stad
+   ============================================ *@
+<div class="row mt-3">
+    <div class="col-md-8">
 
-<div class="mt-4">
-    <button class="btn btn-secondary" @onclick="ToggleCrimeList">
-        @((showCrimeList ? "Sluit delicten" : "Delicten bekijken"))
-    </button>
-
-    @if (showCrimeList)
-    {
-        <div class="mt-3">
-            <div class="mb-3">
-                <label>Filter op type delict:</label>
-                <select class="form-control w-50" @bind="SelectedFilterType">
-                    <option value="">Alles</option>
-                    <option value="Diefstal">Diefstal</option>
-                    <option value="Vandalisme">Vandalisme</option>
-                    <option value="Overlast">Overlast</option>
-                </select>
-            </div>
-
-            @if (crimes == null)
-            {
-                <p>Loading...</p>
-            }
-            else if (!crimes.Any())
-            {
-                <p>Geen delicten gevonden.</p>
-            }
-            else
-            {
-                <table class="table table-striped">
-                    <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Type</th>
-                        <th>Omschrijving</th>
-                        <th>Adres</th>
-                        <th>Lat / Lng</th>
-                        <th>Tijd</th>
-                        <th>Acties</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var c in crimes)
-                    {
-                        <tr>
-                            <td>@c.Id</td>
-                            <td><input class="form-control" @bind="c.Type"/></td>
-                            <td><input class="form-control" @bind="c.Description"/></td>
-                            <td>@c.Street @c.HouseNumber, @c.Postcode @c.City, @c.Province</td>
-                            <td>@c.Lat, @c.Lng</td>
-                            <td>@c.IncidentDateTime.ToString("dd-MM-yyyy HH:mm")</td>
-                            <td>
-                                <button class="btn btn-sm btn-success me-1" @onclick="() => UpdateCrime(c)">Opslaan</button>
-                                <button class="btn btn-sm btn-danger" @onclick="() => DeleteCrime(c)">Verwijderen</button>
-                            </td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            }
+        <!-- Tabs -->
+        <div class="home-tabs">
+            <button class="home-tab-btn @(showFilters ? "" : "active-tab")"
+                    @onclick="ShowOverview">
+                Overzicht
+            </button>
+            <button class="home-tab-btn @(showFilters ? "active-tab" : "")"
+                    @onclick="ShowFilters">
+                Filters
+            </button>
         </div>
-    }
+
+        @if (!showFilters)
+        {
+            @* OVERZICHT: details van het geselecteerde delict *@
+            <div class="delict-card">
+                @if (selectedCrime is null)
+                {
+                    <h5 class="delict-title">Geen delict geselecteerd</h5>
+                    <p class="text-muted mb-0">
+                        Voeg een nieuw delict toe of gebruik de database-overzichtspagina.
+                    </p>
+                }
+                else
+                {
+                    <div class="delict-card-header">
+                        <div>
+                            <span class="delict-title">Delict #@selectedCrime.Id</span>
+
+                            <p class="mb-1 mt-2">
+                                <strong>Type delict</strong><br />
+                                @selectedCrime.Type
+                            </p>
+
+                            <p class="mb-1">
+                                <strong>Beschrijving</strong><br />
+                                @selectedCrime.Description
+                            </p>
+
+                            <p class="mb-0">
+                                <strong>Locatie</strong><br />
+                                @selectedCrime.Street @selectedCrime.HouseNumber,
+                                @selectedCrime.Postcode @selectedCrime.City,
+                                @selectedCrime.Province
+                            </p>
+
+                            <p class="mt-2 mb-0">
+                                <small>@selectedCrime.IncidentDateTime.ToString("dd-MM-yyyy HH:mm")</small>
+                            </p>
+                        </div>
+
+                        <!-- Start bewerken van dit delict -->
+                        <button class="delict-edit-btn"
+                                @onclick="async () => await StartEditCrime(selectedCrime.Id)">
+                            Bewerken
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            @* FILTERS-tab: filtervelden + knoppen *@
+            <div class="filter-card">
+                <div class="filter-card-title">Filteren</div>
+
+                <!-- Inputs in 2 kolommen -->
+                <div class="filter-grid">
+                    <div>
+                        <label>Van</label>
+                        <input type="datetime-local"
+                               class="form-control"
+                               @bind="filterFrom" />
+                    </div>
+
+                    <div>
+                        <label>Tot</label>
+                        <input type="datetime-local"
+                               class="form-control"
+                               @bind="filterTo" />
+                    </div>
+
+                    <div>
+                        <label>Type</label>
+                        <select class="form-control" @bind="filterType">
+                            <option value="">Alle types</option>
+                            <option value="Diefstal">Diefstal</option>
+                            <option value="Vandalisme">Vandalisme</option>
+                            <option value="Overlast">Overlast</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label>Stad</label>
+                        <input class="form-control" @bind="filterCity" />
+                    </div>
+                </div>
+
+                <!-- Knoppen rechts onder, onder elkaar -->
+                <div class="filter-actions">
+                    <button class="btn btn-filter-cancel" @onclick="ResetFilters">
+                        Annuleren
+                    </button>
+                    <button class="btn btn-filter-apply" @onclick="ApplyFiltersAndUpdate">
+                        Pas toe
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<hr />
+
+@* Link naar de aparte database-overzichtspagina met alle delicten in tabel *@
+<div class="mt-4">
+    <a class="btn btn-secondary" href="/database">
+        Delictenlijst (database-overzicht)
+    </a>
 </div>
 
 @code {
-    private string street = "", houseNumber = "", postcode = "", city = "", province = "", type = "", description = "";
-    private double lat, lng;
+    // ============================================
+    // STATE: FORM-VELDEN VOOR DELICT
+    // ============================================
+    private string street = "";
+    private string houseNumber = "";
+    private string postcode = "";
+    private string city = "";
+    private string province = "";
+    private string type = "";
+    private string description = "";
+    private double lat;
+    private double lng;
     private DateTime incidentDateTime = DateTime.Now;
 
-    private DotNetObjectReference<Home>? objRef;
-
-    private List<Crime>? crimes;
+    // ============================================
+    // STATE: DATA UIT DB (ALLE + GEFILTERD + SELECTIE)
+    // ============================================
     private List<Crime>? allCrimes;
-    private bool showCrimeList = false;
-    private string selectedFilterType = "";
+    private List<Crime>? filteredCrimes;
+    private Crime? selectedCrime;
 
-    private string SelectedFilterType
+    // ============================================
+    // STATE: FILTERS EN TAB-BEHAVIOUR
+    // ============================================
+    private bool showFilters = false;
+    private DateTime? filterFrom;
+    private DateTime? filterTo;
+    private string filterType = "";
+    private string filterCity = "";
+
+    // ============================================
+    // STATE: BEWERKMODUS
+    // ============================================
+    private bool isEditing = false;
+    private int? editingCrimeId = null;
+
+    // ============================================
+    // STATE: JS INTEROP / KAART
+    // ============================================
+    private DotNetObjectReference<Home>? objRef;
+    private bool _mapInitialized = false;
+    private bool _needsMarkerRefresh = false;
+
+    /// <summary>
+    /// Wordt aangeroepen wanneer de pagina wordt geïnitialiseerd.
+    /// Haalt alle delicten op en past de filters toe.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
     {
-        get => selectedFilterType;
-        set
-        {
-            selectedFilterType = value;
-            FilterCrimes();
-        }
+        await LoadCrimes();
     }
 
-    protected override async Task OnInitializedAsync() => await LoadCrimes();
+    /// <summary>
+    /// Haalt alle delicten op via de CrimeService en zet een standaard geselecteerd delict.
+    /// Roept daarna ApplyFilters aan om filteredCrimes te vullen.
+    /// </summary>
+    private async Task LoadCrimes()
+    {
+        allCrimes = await CrimeService.GetAllAsync();
 
+        if (selectedCrime is null && allCrimes is { Count: > 0 })
+        {
+            selectedCrime = allCrimes.First();
+        }
+
+        ApplyFilters();
+    }
+
+    /// <summary>
+    /// Filtert allCrimes op basis van datum, type en stad.
+    /// Slaat resultaat op in filteredCrimes en zet een vlag
+    /// zodat markers op de kaart opnieuw getekend worden.
+    /// </summary>
+    private void ApplyFilters()
+    {
+        if (allCrimes is null)
+        {
+            filteredCrimes = null;
+            return;
+        }
+
+        IEnumerable<Crime> query = allCrimes;
+
+        if (filterFrom is not null)
+            query = query.Where(c => c.IncidentDateTime >= filterFrom.Value);
+
+        if (filterTo is not null)
+            query = query.Where(c => c.IncidentDateTime <= filterTo.Value);
+
+        if (!string.IsNullOrWhiteSpace(filterType))
+            query = query.Where(c => c.Type == filterType);
+
+        if (!string.IsNullOrWhiteSpace(filterCity))
+            query = query.Where(c => c.City == filterCity);
+
+        filteredCrimes = query.ToList();
+        _needsMarkerRefresh = true;
+    }
+
+    /// <summary>
+    /// Past filters toe en triggert UI-hertekenen.
+    /// Aangeroepen bij klik op 'Pas toe' in de filtersectie.
+    /// </summary>
+    private void ApplyFiltersAndUpdate()
+    {
+        ApplyFilters();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Reset alle filtervelden naar standaard en past de filters opnieuw toe.
+    /// </summary>
+    private void ResetFilters()
+    {
+        filterFrom = null;
+        filterTo = null;
+        filterType = "";
+        filterCity = "";
+
+        ApplyFilters();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Na elke render:
+    /// - Initialiseert eenmalig de Leaflet-kaart en JS helper.
+    /// - Stuurt gefilterde delicten naar JS om markers te tekenen.
+    /// </summary>
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (objRef == null)
-            objRef = DotNetObjectReference.Create(this);
-
-        await JS.InvokeVoidAsync("initCrimeMap");
-        await JS.InvokeVoidAsync("setDotNetHelper", objRef);
-
-        if (allCrimes != null)
+        if (firstRender)
         {
-            var crimesJson = System.Text.Json.JsonSerializer.Serialize(allCrimes);
+            objRef ??= DotNetObjectReference.Create(this);
+
+            await JS.InvokeVoidAsync("initCrimeMap");
+            await JS.InvokeVoidAsync("setDotNetHelper", objRef);
+
+            _mapInitialized = true;
+        }
+
+        if (_mapInitialized && _needsMarkerRefresh && filteredCrimes is not null)
+        {
+            _needsMarkerRefresh = false;
+
+            var crimesJson = System.Text.Json.JsonSerializer.Serialize(filteredCrimes);
             await JS.InvokeVoidAsync("showCrimesFiltered", crimesJson);
         }
     }
 
-    private async Task LoadCrimes()
-    {
-        allCrimes = await Db.Crimes.OrderByDescending(c => c.CreatedAt).ToListAsync();
-        FilterCrimes();
-    }
-
-    private void FilterCrimes()
-    {
-        crimes = string.IsNullOrEmpty(selectedFilterType)
-            ? allCrimes
-            : allCrimes?.Where(c => c.Type == selectedFilterType).ToList();
-
-        var crimesJson = System.Text.Json.JsonSerializer.Serialize(crimes);
-        _ = JS.InvokeVoidAsync("showCrimesFiltered", crimesJson);
-    }
-
+    /// <summary>
+    /// Wordt door JavaScript aangeroepen wanneer de gebruiker op de kaart klikt.
+    /// Werkt de adres- en coördinatenvelden bij op basis van de click-locatie.
+    /// </summary>
     [JSInvokable]
-    public void MapClicked(double clickedLat, double clickedLng, string clickedPostcode, string clickedCity, string clickedProvince, string clickedStreet, string clickedHouseNumber)
+    public void MapClicked(
+        double clickedLat,
+        double clickedLng,
+        string clickedPostcode,
+        string clickedCity,
+        string clickedProvince,
+        string clickedStreet,
+        string clickedHouseNumber)
     {
         lat = clickedLat;
         lng = clickedLng;
@@ -173,48 +406,163 @@
         province = clickedProvince;
         street = clickedStreet ?? "";
         houseNumber = clickedHouseNumber ?? "";
+
         StateHasChanged();
     }
 
-    private async Task PlacePin() => await JS.InvokeVoidAsync("placePinByAddress", street, houseNumber, postcode, city, province, type);
+    /// <summary>
+    /// Roept een JS-functie aan om op basis van de ingevulde adresgegevens
+    /// een marker op de kaart te plaatsen (geocoding aan JS-kant).
+    /// </summary>
+    private async Task PlacePin()
+        => await JS.InvokeVoidAsync("placePinByAddress", street, houseNumber, postcode, city, province, type);
 
-    private async Task AddCrime()
+    /// <summary>
+    /// Valideert invoer en maakt een nieuw delict aan of werkt een bestaand delict bij.
+    /// - Bij nieuw delict: aanmaken via CrimeService.AddAsync en marker toevoegen op kaart.
+    /// - Bij bewerken: CrimeService.UpdateAsync aanroepen.
+    /// Daarna formulier resetten en opnieuw data laden.
+    /// </summary>
+    private async Task SubmitCrime()
     {
-        if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(description)) return;
-        if (lat == 0 && lng == 0) { await JS.InvokeVoidAsync("alert", "Klik eerst op de kaart of zoek een adres."); return; }
+        if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(description))
+            return;
 
-        var crime = new Crime
+        if (lat == 0 && lng == 0)
         {
-            Type = type,
-            Description = description,
-            Street = street,
-            HouseNumber = houseNumber,
-            Postcode = postcode,
-            City = city,
-            Province = province,
-            Lat = lat,
-            Lng = lng,
-            IncidentDateTime = incidentDateTime,
-            CreatedAt = DateTime.Now
-        };
+            await JS.InvokeVoidAsync("alert", "Klik eerst op de kaart of zoek een adres.");
+            return;
+        }
 
-        Db.Crimes.Add(crime);
-        await Db.SaveChangesAsync();
+        Crime? result;
 
-        await JS.InvokeVoidAsync("addCrime", crime.Lat, crime.Lng, crime.Description, crime.Type);
+        if (!isEditing)
+        {
+            // Nieuw delict
+            var crime = new Crime
+            {
+                Type = type,
+                Description = description,
+                Street = street,
+                HouseNumber = houseNumber,
+                Postcode = postcode,
+                City = city,
+                Province = province,
+                Lat = lat,
+                Lng = lng,
+                IncidentDateTime = incidentDateTime,
+                CreatedAt = DateTime.Now
+            };
 
-        // Reset form
-        type = description = street = houseNumber = postcode = city = province = "";
-        lat = lng = 0;
-        incidentDateTime = DateTime.Now;
+            result = await CrimeService.AddAsync(crime);
 
+            await JS.InvokeVoidAsync("addCrime", result.Lat, result.Lng, result.Description, result.Type);
+
+            selectedCrime = result;
+        }
+        else
+        {
+            // Bestaand delict bijwerken
+            if (editingCrimeId is null)
+                return;
+
+            var crime = new Crime
+            {
+                Id = editingCrimeId.Value,
+                Type = type,
+                Description = description,
+                Street = street,
+                HouseNumber = houseNumber,
+                Postcode = postcode,
+                City = city,
+                Province = province,
+                IncidentDateTime = incidentDateTime,
+                Lat = lat,
+                Lng = lng
+            };
+
+            result = await CrimeService.UpdateAsync(crime);
+            if (result is null)
+                return;
+
+            selectedCrime = result;
+            isEditing = false;
+            editingCrimeId = null;
+        }
+
+        ResetForm();
         await LoadCrimes();
-        await JS.InvokeVoidAsync("alert", "Delict toegevoegd!");
     }
 
-    private async Task UpdateCrime(Crime crime) { Db.Crimes.Update(crime); await Db.SaveChangesAsync(); FilterCrimes(); }
+    /// <summary>
+    /// Zet alle formulier-velden terug naar standaardwaarden.
+    /// Wordt gebruikt bij 'Alles wissen' en na succesvol opslaan.
+    /// </summary>
+    private void ResetForm()
+    {
+        type = "";
+        description = "";
+        street = "";
+        houseNumber = "";
+        postcode = "";
+        city = "";
+        province = "";
+        lat = 0;
+        lng = 0;
+        incidentDateTime = DateTime.Now;
+    }
 
-    private async Task DeleteCrime(Crime crime) { Db.Crimes.Remove(crime); await Db.SaveChangesAsync(); await LoadCrimes(); }
+    /// <summary>
+    /// Haalt een delict op op basis van id en vult het formulier
+    /// zodat de gebruiker dit delict kan bewerken.
+    /// </summary>
+    private async Task StartEditCrime(int id)
+    {
+        var crime = await CrimeService.GetByIdAsync(id);
+        if (crime is null)
+            return;
 
-    private void ToggleCrimeList() => showCrimeList = !showCrimeList;
+        isEditing = true;
+        editingCrimeId = crime.Id;
+
+        type = crime.Type;
+        description = crime.Description;
+        street = crime.Street;
+        houseNumber = crime.HouseNumber;
+        postcode = crime.Postcode;
+        city = crime.City;
+        province = crime.Province;
+        incidentDateTime = crime.IncidentDateTime;
+        lat = crime.Lat;
+        lng = crime.Lng;
+    }
+
+    /// <summary>
+    /// Stopt de bewerkmodus en reset het formulier zonder wijzigingen op te slaan.
+    /// </summary>
+    private void CancelEdit()
+    {
+        isEditing = false;
+        editingCrimeId = null;
+        ResetForm();
+    }
+
+    /// <summary>
+    /// Zet de UI naar de 'Overzicht'-tab.
+    /// </summary>
+    private void ShowOverview() => showFilters = false;
+
+    /// <summary>
+    /// Zet de UI naar de 'Filters'-tab.
+    /// </summary>
+    private void ShowFilters() => showFilters = true;
+
+    /// <summary>
+    /// Ruimt de DotNetObjectReference netjes op
+    /// wanneer de component wordt opgeruimd.
+    /// </summary>
+    public void Dispose()
+    {
+        objRef?.Dispose();
+    }
 }

@@ -1,0 +1,207 @@
+@page "/editcrime/{Id:int}"
+
+@using WijkAgent.Models
+@using WijkAgent.Data
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
+@using System.Text.Json
+
+@inject WijkAgentDbContext Db
+@inject NavigationManager Nav
+
+<h3>Delict bewerken (database)</h3>
+
+@if (crime is null)
+{
+    <p>Delict wordt geladen...</p>
+}
+else
+{
+    <div class="form-group mb-2">
+        <label>Type</label>
+        <input class="form-control" @bind="crime.Type" />
+    </div>
+
+    <div class="form-group mb-2">
+        <label>Beschrijving</label>
+        <textarea class="form-control" @bind="crime.Description"></textarea>
+    </div>
+
+    <div class="form-group mb-2">
+        <label>Straat</label>
+        <input class="form-control" @bind="crime.Street" />
+    </div>
+
+    <div class="form-group mb-2">
+        <label>Huisnummer</label>
+        <input class="form-control" @bind="crime.HouseNumber" />
+    </div>
+
+    <div class="form-group mb-2">
+        <label>Postcode</label>
+        <input class="form-control" @bind="crime.Postcode" />
+    </div>
+
+    <div class="form-group mb-2">
+        <label>Stad</label>
+        <input class="form-control" @bind="crime.City" />
+    </div>
+
+    <div class="form-group mb-2">
+        <label>Provincie</label>
+        <input class="form-control" @bind="crime.Province" />
+    </div>
+
+    <div class="form-group mb-2">
+        <label>Datum/tijd</label>
+        <input type="datetime-local"
+               class="form-control"
+               @bind="incidentDateTime"
+               @bind:format="yyyy-MM-ddTHH:mm" />
+    </div>
+
+    <div class="form-group mb-2">
+        <label>Lat</label>
+        <input class="form-control" @bind="crime.Lat" />
+    </div>
+
+    <div class="form-group mb-2">
+        <label>Lng</label>
+        <input class="form-control" @bind="crime.Lng" />
+    </div>
+
+    <button class="btn btn-success mt-3 me-2" @onclick="Save">
+        Opslaan
+    </button>
+
+    <button class="btn btn-secondary mt-3" @onclick="Cancel">
+        Annuleren
+    </button>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Crime? crime;
+
+    // Voor de datetime-local input
+    private DateTime incidentDateTime;
+
+    protected override async Task OnInitializedAsync()
+    {
+        crime = await Db.Crimes.FirstOrDefaultAsync(c => c.Id == Id);
+
+        if (crime is null)
+        {
+            // Geen delict gevonden -> terug naar database-overzicht
+            Nav.NavigateTo("/database");
+            return;
+        }
+
+        // DateTime uit de database naar de input kopiëren
+        incidentDateTime = crime.IncidentDateTime;
+    }
+
+    /// <summary>
+    /// Maakt één adresstring van de losse velden.
+    /// </summary>
+    private string BuildAddress()
+    {
+        if (crime is null) return string.Empty;
+
+        return $"{crime.Street} {crime.HouseNumber}, {crime.Postcode} {crime.City}, {crime.Province}";
+    }
+
+    /// <summary>
+    /// Probeert het adres om te zetten naar Lat/Lng via Nominatim.
+    /// Geeft null terug bij elke fout (geen crash).
+    /// </summary>
+    private async Task<(double lat, double lng)?> GeocodeAddressAsync(string address)
+    {
+        if (string.IsNullOrWhiteSpace(address))
+            return null;
+
+        try
+        {
+            var url =
+                $"https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&q={Uri.EscapeDataString(address)}";
+
+            using var http = new HttpClient();
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+
+            // Nominatim vereist een User-Agent header
+            request.Headers.UserAgent.ParseAdd("wijkagent-app/1.0 (your-email@example.com)");
+
+            var response = await http.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Geocoding HTTP error: {response.StatusCode}");
+                return null;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+
+            using var doc = JsonDocument.Parse(json);
+            var first = doc.RootElement.EnumerateArray().FirstOrDefault();
+
+            if (first.ValueKind != JsonValueKind.Object)
+                return null;
+
+            var latStr = first.GetProperty("lat").GetString();
+            var lngStr = first.GetProperty("lon").GetString();
+
+            if (double.TryParse(latStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var lat) &&
+                double.TryParse(lngStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var lng))
+            {
+                return (lat, lng);
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            // Alle fouten afvangen zodat UI niet crasht
+            Console.WriteLine($"Geocoding failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task Save()
+    {
+        if (crime is null)
+            return;
+
+        // Simpele validatie
+        if (string.IsNullOrWhiteSpace(crime.Type) ||
+            string.IsNullOrWhiteSpace(crime.Description) ||
+            string.IsNullOrWhiteSpace(crime.Street) ||
+            string.IsNullOrWhiteSpace(crime.City))
+        {
+            return;
+        }
+
+        // DateTime uit de input terugzetten in het model
+        crime.IncidentDateTime = incidentDateTime;
+
+        // Adres opnieuw opbouwen en geocoden
+        var address = BuildAddress();
+        var coords = await GeocodeAddressAsync(address);
+
+        if (coords is not null)
+        {
+            crime.Lat = coords.Value.lat;
+            crime.Lng = coords.Value.lng;
+        }
+
+        Db.Crimes.Update(crime);
+        await Db.SaveChangesAsync();
+        
+        Nav.NavigateTo("/database");
+    }
+
+    private void Cancel()
+    {
+        Nav.NavigateTo("/database");
+    }
+}
