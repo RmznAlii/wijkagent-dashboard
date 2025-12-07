@@ -1,19 +1,12 @@
 ﻿@page "/database"
 @using WijkAgent.Models
 @using WijkAgent.Services
+@using System.IO
 @inject ICrimeService CrimeService
-
-@* =====================================================
-   PAGINA: Database-overzicht van alle delicten
-   Doel:
-   - Toont alle delicten in een tabelvorm.
-   - Biedt een eenvoudige filter op type delict (Diefstal, Vandalisme, Overlast).
-   - Data wordt opgehaald via CrimeService (centrale data-laag).
-   ===================================================== *@
 
 <h3>Alle delicten in de database</h3>
 
-@* Filter-sectie: gebruiker kan lijst beperken op type delict *@
+<!-- Filter -->
 <div class="mb-3">
     <label>Filter op type delict:</label>
     <select class="form-control w-25" @bind="SelectedFilterType">
@@ -24,7 +17,11 @@
     </select>
 </div>
 
-@* Tabel-sectie: toont aantal delicten + details in tabel *@
+<!-- Export knop -->
+<button class="btn btn-success mb-3" @onclick="ExportToExcel" disabled="@isExporting">
+    @(isExporting ? "Exporteren..." : "Exporteer naar Excel")
+</button>
+
 @if (crimes == null)
 {
     <p>Loading...</p>
@@ -32,53 +29,40 @@
 else
 {
     <p>Aantal delicten: @crimes.Count</p>
+
     <table class="table table-striped">
         <thead>
-        <tr>
-            <th>ID</th>
-            <th>Type</th>
-            <th>Omschrijving</th>
-            <th>Adres</th>
-            <th>Lat / Lng</th>
-            <th>Tijd</th>
-        </tr>
+            <tr>
+                <th>ID</th>
+                <th>Type</th>
+                <th>Omschrijving</th>
+                <th>Adres</th>
+                <th>Lat / Lng</th>
+                <th>Tijd</th>
+            </tr>
         </thead>
         <tbody>
-        @foreach (var c in crimes)
-        {
-            <tr>
-                <td>@c.Id</td>
-                <td>@c.Type</td>
-                <td>@c.Description</td>
-                <td>@c.Street @c.HouseNumber, @c.Postcode @c.City, @c.Province</td>
-                <td>@c.Lat, @c.Lng</td>
-                <td>@c.IncidentDateTime.ToString("dd-MM-yyyy HH:mm")</td>
-            </tr>
-        }
+            @foreach (var c in crimes)
+            {
+                <tr>
+                    <td>@c.Id</td>
+                    <td>@c.Type</td>
+                    <td>@c.Description</td>
+                    <td>@c.Street @c.HouseNumber, @c.Postcode @c.City, @c.Province</td>
+                    <td>@c.Lat, @c.Lng</td>
+                    <td>@c.IncidentDateTime.ToString("dd-MM-yyyy HH:mm")</td>
+                </tr>
+            }
         </tbody>
     </table>
 }
 
 @code {
-    // ==============================================
-    // STATE: DATA UIT DE DATABASE
-    // - allCrimes: volledige lijst uit CrimeService
-    // - crimes: gefilterde lijst die op het scherm staat
-    // ==============================================
     private List<Crime>? crimes;
     private List<Crime>? allCrimes;
-
-    // ==============================================
-    // STATE: GEKOZEN FILTERTYPE
-    // - SelectedFilterType triggert direct FilterCrimes()
-    // ==============================================
     private string selectedFilterType = "";
+    private bool isExporting = false;
 
-    /// <summary>
-    /// Eigenschap gekoppeld aan de dropdown in de UI.
-    /// Bij wijziging wordt automatisch FilterCrimes() aangeroepen
-    /// om de tabel te verversen op basis van het gekozen type.
-    /// </summary>
     private string SelectedFilterType
     {
         get => selectedFilterType;
@@ -89,26 +73,76 @@ else
         }
     }
 
-    /// <summary>
-    /// Wordt eenmalig aangeroepen bij het laden van de pagina.
-    /// Haalt alle delicten op via CrimeService en vult daarna de
-    /// zichtbare lijst (crimes) via FilterCrimes().
-    /// </summary>
     protected override async Task OnInitializedAsync()
     {
         allCrimes = await CrimeService.GetAllAsync();
         FilterCrimes();
     }
 
-    /// <summary>
-    /// Past filter toe op allCrimes op basis van selectedFilterType.
-    /// - Als geen type gekozen is, toont de pagina alle delicten.
-    /// - Anders worden alleen delicten met dat type getoond.
-    /// </summary>
     private void FilterCrimes()
     {
         crimes = string.IsNullOrEmpty(selectedFilterType)
             ? allCrimes
             : allCrimes?.Where(c => c.Type == selectedFilterType).ToList();
+    }
+
+    private async Task ExportToExcel()
+    {
+        if (crimes == null || !crimes.Any())
+            return;
+
+        isExporting = true;
+        try
+        {
+            // Achtergrondthread
+            byte[] bytes = await Task.Run(() =>
+            {
+                using var workbook = new ClosedXML.Excel.XLWorkbook();
+                var ws = workbook.Worksheets.Add("Delicten");
+
+                // Headers
+                ws.Cell(1, 1).Value = "ID";
+                ws.Cell(1, 2).Value = "Type";
+                ws.Cell(1, 3).Value = "Omschrijving";
+                ws.Cell(1, 4).Value = "Adres";
+                ws.Cell(1, 5).Value = "Lat";
+                ws.Cell(1, 6).Value = "Lng";
+                ws.Cell(1, 7).Value = "Tijd";
+
+                int row = 2;
+                foreach (var c in crimes)
+                {
+                    ws.Cell(row, 1).Value = c.Id;
+                    ws.Cell(row, 2).Value = c.Type;
+                    ws.Cell(row, 3).Value = c.Description;
+                    ws.Cell(row, 4).Value = $"{c.Street} {c.HouseNumber}, {c.Postcode} {c.City}, {c.Province}";
+                    ws.Cell(row, 5).Value = c.Lat;
+                    ws.Cell(row, 6).Value = c.Lng;
+                    ws.Cell(row, 7).Value = c.IncidentDateTime.ToString("dd-MM-yyyy HH:mm");
+                    row++;
+                }
+
+                ws.Columns().AdjustToContents();
+
+                using var ms = new MemoryStream();
+                workbook.SaveAs(ms);
+                return ms.ToArray();
+            });
+
+            // Opslaan op apparaat
+            var filePath = Path.Combine(FileSystem.Current.AppDataDirectory, "Delicten.xlsx");
+            await File.WriteAllBytesAsync(filePath, bytes);
+
+            // Optioneel: toon melding
+            await MainThread.InvokeOnMainThreadAsync(() =>
+            {
+                Application.Current?.MainPage?.DisplayAlert("Export voltooid", $"Bestand opgeslagen: {filePath}", "OK");
+            });
+        }
+        finally
+        {
+            isExporting = false;
+            StateHasChanged();
+        }
     }
 }
