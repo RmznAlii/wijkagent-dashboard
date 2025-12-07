@@ -23,8 +23,10 @@
 
 <body>
 
+<!-- Blazor App Container -->
 <div id="app">Loading...</div>
 
+<!-- Error UI -->
 <div id="blazor-error-ui">
     An unhandled error has occurred.
     <a href="" class="reload">Reload</a>
@@ -34,11 +36,24 @@
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<!-- Custom JavaScript -->
+<!-- Custom Map Code -->
 <script src="js/map.js"></script>
+<script src="js/filesaver.js"></script>
 
-<!-- Blazor WebView -->
+<!-- Blazor WebView Script -->
 <script src="_framework/blazor.webview.js" autostart="false"></script>
+
+<!-- Excel Download Helper -->
+<script>
+    window.downloadFile = (filename, contentType, base64Data) => {
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = "data:" + contentType + ";base64," + base64Data;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+</script>
 
 </body>
 </html>
