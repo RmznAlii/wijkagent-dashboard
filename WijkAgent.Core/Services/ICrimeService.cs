@@ -1,6 +1,6 @@
-using WijkAgent.Models;
+using WijkAgent.Core.Models;
 
-namespace WijkAgent.Services
+namespace WijkAgent.Core.Services
 {
     /// <summary>
     /// Interface voor de CrimeService.

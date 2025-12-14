@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using WijkAgent.Data;
-using WijkAgent.Models;
+using WijkAgent.Core.Data;
+using WijkAgent.Core.Models;
 
-namespace WijkAgent.Services
+namespace WijkAgent.Core.Services
 {
     /// <summary>
     /// Serviceklasse die CRUD-operaties uitvoert voor delicten (Crime).

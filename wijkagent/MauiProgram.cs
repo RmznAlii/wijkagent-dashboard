@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using WijkAgent.Data;
-using WijkAgent.Services;
+using WijkAgent.Core.Data;
+using WijkAgent.Core.Services;
 
 namespace WijkAgent;
 

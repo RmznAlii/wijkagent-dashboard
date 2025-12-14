@@ -1,4 +1,4 @@
-namespace WijkAgent.Models
+namespace WijkAgent.Core.Models
 {
     /// <summary>
     /// Modelklasse die één delict (Crime) vertegenwoordigt in de WijkAgent-applicatie.

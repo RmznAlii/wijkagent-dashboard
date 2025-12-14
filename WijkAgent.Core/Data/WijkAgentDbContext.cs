@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using WijkAgent.Models;
+using WijkAgent.Core.Models;
 
-namespace WijkAgent.Data;
+namespace WijkAgent.Core.Data;
 
 
 /// <summary>
