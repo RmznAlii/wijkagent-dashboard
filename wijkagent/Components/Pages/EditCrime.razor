@@ -1,17 +1,25 @@
 @page "/editcrime/{Id:int}"
 
 @using WijkAgent.Models
-@using WijkAgent.Data
-@using Microsoft.EntityFrameworkCore
-@using System.Globalization
+@using WijkAgent.Services
 @using System.Text.Json
+@using System.Globalization
+@using System.Net.Http
+@using System.Linq
 
-@inject WijkAgentDbContext Db
+@inject ICrimeService CrimeService
 @inject NavigationManager Nav
+@* 
+    EditCrime Page
+    ----------------------
+    Deze pagina laadt één specifiek delict op basis van het Id in de URL.
+    De gebruiker kan hier het delict aanpassen en opslaan.
+    Na opslaan wordt het bijgewerkte delict teruggestuurd naar CrimeService
+    en gaat de gebruiker terug naar Home (waar de kaart + lijst opnieuw laden).
+*@
+<h3>Delict bewerken</h3>
 
-<h3>Delict bewerken (database)</h3>
-
-@if (crime is null)
+@if (crime == null)
 {
     <p>Delict wordt geladen...</p>
 }
@@ -28,46 +36,13 @@ else
     </div>
 
     <div class="form-group mb-2">
-        <label>Straat</label>
-        <input class="form-control" @bind="crime.Street" />
-    </div>
-
-    <div class="form-group mb-2">
-        <label>Huisnummer</label>
-        <input class="form-control" @bind="crime.HouseNumber" />
-    </div>
-
-    <div class="form-group mb-2">
-        <label>Postcode</label>
-        <input class="form-control" @bind="crime.Postcode" />
-    </div>
-
-    <div class="form-group mb-2">
-        <label>Stad</label>
-        <input class="form-control" @bind="crime.City" />
-    </div>
-
-    <div class="form-group mb-2">
-        <label>Provincie</label>
-        <input class="form-control" @bind="crime.Province" />
+        <label>Adres</label>
+        <input class="form-control" @bind="crime.Address" />
     </div>
 
     <div class="form-group mb-2">
         <label>Datum/tijd</label>
-        <input type="datetime-local"
-               class="form-control"
-               @bind="incidentDateTime"
-               @bind:format="yyyy-MM-ddTHH:mm" />
-    </div>
-
-    <div class="form-group mb-2">
-        <label>Lat</label>
-        <input class="form-control" @bind="crime.Lat" />
-    </div>
-
-    <div class="form-group mb-2">
-        <label>Lng</label>
-        <input class="form-control" @bind="crime.Lng" />
+        <input class="form-control" @bind="crime.DateTimeString" />
     </div>
 
     <button class="btn btn-success mt-3 me-2" @onclick="Save">
@@ -82,34 +57,17 @@ else
 @code {
     [Parameter] public int Id { get; set; }
 
-    private Crime? crime;
-
-    // Voor de datetime-local input
-    private DateTime incidentDateTime;
+    private CrimeModel? crime;
 
     protected override async Task OnInitializedAsync()
     {
-        crime = await Db.Crimes.FirstOrDefaultAsync(c => c.Id == Id);
+        crime = await CrimeService.GetByIdAsync(Id);
 
         if (crime is null)
         {
-            // Geen delict gevonden -> terug naar database-overzicht
-            Nav.NavigateTo("/database");
-            return;
+            // Geen delict gevonden -> terug naar home
+            Nav.NavigateTo("/");
         }
-
-        // DateTime uit de database naar de input kopiëren
-        incidentDateTime = crime.IncidentDateTime;
-    }
-
-    /// <summary>
-    /// Maakt één adresstring van de losse velden.
-    /// </summary>
-    private string BuildAddress()
-    {
-        if (crime is null) return string.Empty;
-
-        return $"{crime.Street} {crime.HouseNumber}, {crime.Postcode} {crime.City}, {crime.Province}";
     }
 
     /// <summary>
@@ -136,6 +94,7 @@ else
 
             if (!response.IsSuccessStatusCode)
             {
+                // Geen succes (bijv. 429, 500, …) gewoon null terug
                 Console.WriteLine($"Geocoding HTTP error: {response.StatusCode}");
                 return null;
             }
@@ -175,33 +134,38 @@ else
         // Simpele validatie
         if (string.IsNullOrWhiteSpace(crime.Type) ||
             string.IsNullOrWhiteSpace(crime.Description) ||
-            string.IsNullOrWhiteSpace(crime.Street) ||
-            string.IsNullOrWhiteSpace(crime.City))
+            string.IsNullOrWhiteSpace(crime.Address))
         {
             return;
         }
 
-        // DateTime uit de input terugzetten in het model
-        crime.IncidentDateTime = incidentDateTime;
-
-        // Adres opnieuw opbouwen en geocoden
-        var address = BuildAddress();
-        var coords = await GeocodeAddressAsync(address);
-
-        if (coords is not null)
+        try
         {
-            crime.Lat = coords.Value.lat;
-            crime.Lng = coords.Value.lng;
+            // Probeer nieuwe coördinaten op te halen
+            var coords = await GeocodeAddressAsync(crime.Address);
+
+            if (coords is not null)
+            {
+                crime.Lat = coords.Value.lat;
+                crime.Lng = coords.Value.lng;
+            }
+            // Als coords null is, laten we Lat/Lng zoals ze waren
+        }
+        catch (Exception ex)
+        {
+            // Extra safety, zou eigenlijk niet meer gebeuren door de try/catch hierboven
+            Console.WriteLine($"Error while geocoding in Save(): {ex.Message}");
         }
 
-        Db.Crimes.Update(crime);
-        await Db.SaveChangesAsync();
-        
-        Nav.NavigateTo("/database");
+        // Updaten in centrale service 
+        await CrimeService.UpdateAsync(crime);
+
+        // Terug naar Home (kaart + markers opnieuw)
+        Nav.NavigateTo("/");
     }
 
     private void Cancel()
     {
-        Nav.NavigateTo("/database");
+        Nav.NavigateTo("/");
     }
 }
