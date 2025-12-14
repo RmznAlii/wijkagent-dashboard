@@ -70,7 +70,17 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Content Include=".github\workflows\main.yml" />
+        <None Remove=".github/**" />
+        <MauiAsset Remove=".github/**" />
+        <Content Remove=".github/**" />
+        <BundleResource Remove=".github/**" />
+        <EmbeddedResource Remove=".github/**" />
+    </ItemGroup>
+
+
+
+    <ItemGroup>
+      <ProjectReference Include="..\WijkAgent.Core\WijkAgent.Core.csproj" />
     </ItemGroup>
 
 </Project>
