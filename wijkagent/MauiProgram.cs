@@ -31,6 +31,9 @@ public static class MauiProgram
         // Services
         builder.Services.AddScoped<ICrimeService, CrimeService>();
 
+
+        builder.Services.AddScoped<ISocialMediaService, MockSocialMediaService>();
+
         return builder.Build();
     }
 }

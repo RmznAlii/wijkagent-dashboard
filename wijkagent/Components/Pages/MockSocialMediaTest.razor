@@ -1,0 +1,45 @@
+﻿@page "/weather"
+@using WijkAgent.Core.Models
+@using WijkAgent.Core.Services
+@using System.IO
+
+@inject ISocialMediaService SocialMediaService
+
+<h3>Mock Social Media Test</h3>
+
+<button @onclick="LoadPosts">Laad berichten</button>
+
+@if (_posts == null)
+{
+    <p>Nog niets geladen</p>
+}
+else if (!_posts.Any())
+{
+    <p>Geen resultaten</p>
+}
+else
+{
+    <ul>
+        @foreach (var post in _posts)
+        {
+            <li>
+                <strong>@post.Username</strong>
+                (@post.PostedAt): @post.Content
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private IReadOnlyList<SocialMediaPost>? _posts;
+
+    private async Task LoadPosts()
+    {
+        var incidentTime = DateTime.Now;
+        var keywords = new[] { "steekpartij", "plein" };
+
+        _posts = await SocialMediaService.GetPostsForIncidentAsync(
+            incidentTime,
+            keywords);
+    }
+}
