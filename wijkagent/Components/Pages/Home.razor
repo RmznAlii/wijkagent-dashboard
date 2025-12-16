@@ -2,8 +2,10 @@
 
 @using WijkAgent.Core.Models
 @using WijkAgent.Core.Services
+@using System
 @inject ICrimeService CrimeService
 @inject IJSRuntime JS
+@inject CrimeNotifier CrimeNotifier
 
 @implements IDisposable
 
@@ -275,7 +277,23 @@
     /// </summary>
     protected override async Task OnInitializedAsync()
     {
+        // subscribe to live notifications
+        CrimeNotifier.CrimeAdded += OnCrimeAdded;
+
         await LoadCrimes();
+    }
+
+    private void OnCrimeAdded(Crime c)
+    {
+        // marshal to Blazor UI thread
+        _ = InvokeAsync(() =>
+        {
+            allCrimes ??= new List<Crime>();
+            // insert newest at top (consistent with OrderByDescending CreatedAt)
+            allCrimes.Insert(0, c);
+            ApplyFilters();
+            StateHasChanged();
+        });
     }
 
     /// <summary>
@@ -553,6 +571,8 @@
     /// </summary>
     public void Dispose()
     {
+        // unsubscribe to avoid memory leak
+        CrimeNotifier.CrimeAdded -= OnCrimeAdded;
         objRef?.Dispose();
     }
 }
