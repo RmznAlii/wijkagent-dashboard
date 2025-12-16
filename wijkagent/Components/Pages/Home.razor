@@ -227,6 +227,7 @@
         }
     </div>
 </div>
+
 @code {
     // ============================================
     // STATE: FORM-VELDEN VOOR DELICT
@@ -291,6 +292,10 @@
             allCrimes ??= new List<Crime>();
             // insert newest at top (consistent with OrderByDescending CreatedAt)
             allCrimes.Insert(0, c);
+
+            // Nieuw: na toevoegen automatisch het nieuwste delict selecteren (zoals gewenst)
+            selectedCrime = c;
+
             ApplyFilters();
             StateHasChanged();
         });
@@ -419,6 +424,23 @@
     }
 
     /// <summary>
+    /// Nieuw: Wordt door JavaScript aangeroepen wanneer de gebruiker op een marker klikt.
+    /// Hiermee kan de gebruiker zelf een delict selecteren dat in het overzicht wordt weergegeven.
+    /// </summary>
+    [JSInvokable]
+    public async Task MarkerClicked(int crimeId)
+    {
+        // Optioneel: bij marker-click altijd terug naar Overzicht-tab
+        showFilters = false;
+
+        // Probeer eerst uit de al geladen lijst (snel), anders fallback naar DB
+        selectedCrime = allCrimes?.FirstOrDefault(c => c.Id == crimeId)
+                       ?? await CrimeService.GetByIdAsync(crimeId);
+
+        StateHasChanged();
+    }
+
+    /// <summary>
     /// Roept een JS-functie aan om op basis van de ingevulde adresgegevens
     /// een marker op de kaart te plaatsen (geocoding aan JS-kant).
     /// </summary>
@@ -464,7 +486,8 @@
 
             result = await CrimeService.AddAsync(crime);
 
-            await JS.InvokeVoidAsync("addCrime", result.Lat, result.Lng, result.Description, result.Type);
+            // Nieuw: geef ook het ID mee zodat de marker klikbaar het juiste delict selecteert
+            await JS.InvokeVoidAsync("addCrime", result.Id, result.Lat, result.Lng, result.Description, result.Type);
 
             selectedCrime = result;
         }
