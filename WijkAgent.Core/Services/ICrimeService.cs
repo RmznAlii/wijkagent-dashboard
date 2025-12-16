@@ -53,13 +53,20 @@ namespace WijkAgent.Core.Services
         Task<Crime?> UpdateAsync(Crime crime);
 
         /// <summary>
+        /// Nieuw: verwijdert een bestaand delict op basis van ID.
+        /// </summary>
+        /// <param name="id">Het ID van het delict dat verwijderd moet worden.</param>
+        /// <returns>True als verwijderen gelukt is, anders false.</returns>
+        Task<bool> DeleteAsync(int id);
+
+        /// <summary>
         /// Haalt een lijst delicten op die voldoen aan de opgegeven filtercriteria.
         /// Alle filterparameters zijn optioneel.
         /// </summary>
         /// <param name="from">Optioneel: filter vanaf deze datum/tijd.</param>
         /// <param name="to">Optioneel: filter tot en met deze datum/tijd.</param>
         /// <param name="type">Optioneel: type delict waarop gefilterd wordt.</param>
-        /// <param name="city">Optioneel: stad waarop gefilterd wordt.</param>
+        /// <param name="city">Optioneel: stad waarop wordt gefilterd.</param>
         /// <returns>Lijst delicten die voldoen aan de filterinstellingen.</returns>
         Task<List<Crime>> GetFilteredAsync(
             DateTime? from,
