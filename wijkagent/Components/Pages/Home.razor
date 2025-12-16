@@ -167,11 +167,18 @@
                             </p>
                         </div>
 
-                        <!-- Start bewerken van dit delict -->
-                        <button class="delict-edit-btn"
-                                @onclick="async () => await StartEditCrime(selectedCrime.Id)">
-                            Bewerken
-                        </button>
+                        <!-- Acties voor geselecteerd delict -->
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <button class="delict-edit-btn"
+                                    @onclick="async () => await StartEditCrime(selectedCrime.Id)">
+                                Bewerken
+                            </button>
+
+                            <button class="btn btn-danger"
+                                    @onclick="DeleteSelectedCrime">
+                                Verwijderen
+                            </button>
+                        </div>
                     </div>
                 }
             </div>
@@ -309,7 +316,12 @@
     {
         allCrimes = await CrimeService.GetAllAsync();
 
-        if (selectedCrime is null && allCrimes is { Count: > 0 })
+        // Nieuw: als het geselecteerde delict verwijderd is, of null is, pak dan automatisch de nieuwste
+        if (allCrimes is null || allCrimes.Count == 0)
+        {
+            selectedCrime = null;
+        }
+        else if (selectedCrime is null || !allCrimes.Any(c => c.Id == selectedCrime.Id))
         {
             selectedCrime = allCrimes.First();
         }
@@ -523,6 +535,46 @@
 
         ResetForm();
         await LoadCrimes();
+    }
+
+    /// <summary>
+    /// Nieuw: Verwijdert het geselecteerde delict (na bevestiging) en refresht kaart + lijst.
+    /// </summary>
+    private async Task DeleteSelectedCrime()
+    {
+        if (selectedCrime is null)
+            return;
+
+        // Passende comment: extra safety zodat je niet per ongeluk data weggooit
+        var confirm = await JS.InvokeAsync<bool>("confirm",
+            $"Weet je zeker dat je delict #{selectedCrime.Id} wilt verwijderen?");
+
+        if (!confirm)
+            return;
+
+        var id = selectedCrime.Id;
+
+        // Als je nu dit delict aan het bewerken was: stop bewerken
+        if (isEditing && editingCrimeId == id)
+        {
+            isEditing = false;
+            editingCrimeId = null;
+            ResetForm();
+        }
+
+        var deleted = await CrimeService.DeleteAsync(id);
+
+        if (!deleted)
+        {
+            await JS.InvokeVoidAsync("alert", "Verwijderen is mislukt. Delict bestaat mogelijk niet meer.");
+            return;
+        }
+
+        // Zet selectie leeg; LoadCrimes kiest daarna automatisch de nieuwste (of null)
+        selectedCrime = null;
+
+        await LoadCrimes();
+        StateHasChanged();
     }
 
     /// <summary>

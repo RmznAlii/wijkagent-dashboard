@@ -100,6 +100,22 @@ namespace WijkAgent.Core.Services
         }
 
         /// <summary>
+        /// Nieuw: verwijdert een bestaand delict op basis van ID.
+        /// </summary>
+        /// <param name="id">Het ID van het delict dat verwijderd moet worden.</param>
+        /// <returns>True als verwijderen gelukt is, anders false.</returns>
+        public async Task<bool> DeleteAsync(int id)
+        {
+            var existing = await _db.Crimes.FirstOrDefaultAsync(c => c.Id == id);
+            if (existing is null)
+                return false;
+
+            _db.Crimes.Remove(existing);
+            await _db.SaveChangesAsync();
+            return true;
+        }
+
+        /// <summary>
         /// Haalt delicten op die voldoen aan de opgegeven filtercriteria.
         /// Mogelijke filters:
         /// - Datum vanaf (from)
