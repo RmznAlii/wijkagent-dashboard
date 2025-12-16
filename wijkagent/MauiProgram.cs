@@ -40,13 +40,21 @@ public static class MauiProgram
 
         //builder.Services.AddScoped<ISocialMediaService, MockSocialMediaService>();
 
-        builder.Services.AddSingleton<ISocialMediaService>(sp =>
+        // X API service
+        builder.Services.AddSingleton<SocialMediaService>(sp =>
         {
             var httpClient = new HttpClient();
             var token = config["XApi:BearerToken"];
 
             return new SocialMediaService(httpClient, token);
         });
+
+        // Mock service
+        builder.Services.AddSingleton<MockSocialMediaService>();
+
+        // Control (Dit bepaalt welke service de UI gebruikt)
+        builder.Services.AddSingleton<ISocialMediaService, SocialMediaControlService>();
+
 
 
         return builder.Build();
