@@ -2,6 +2,8 @@
 using Microsoft.Extensions.Logging;
 using WijkAgent.Core.Data;
 using WijkAgent.Core.Services;
+using Microsoft.Extensions.Configuration;
+
 
 namespace WijkAgent;
 
@@ -10,6 +12,10 @@ public static class MauiProgram
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
+
+        var config = new ConfigurationBuilder()
+        .AddJsonFile("appsettings.json", optional: false)
+        .Build();
 
         builder
             .UseMauiApp<App>()
@@ -32,7 +38,16 @@ public static class MauiProgram
         builder.Services.AddScoped<ICrimeService, CrimeService>();
 
 
-        builder.Services.AddScoped<ISocialMediaService, MockSocialMediaService>();
+        //builder.Services.AddScoped<ISocialMediaService, MockSocialMediaService>();
+
+        builder.Services.AddSingleton<ISocialMediaService>(sp =>
+        {
+            var httpClient = new HttpClient();
+            var token = config["XApi:BearerToken"];
+
+            return new SocialMediaService(httpClient, token);
+        });
+
 
         return builder.Build();
     }
