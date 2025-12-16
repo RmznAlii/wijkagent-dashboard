@@ -129,6 +129,9 @@
         @if (!showFilters)
         {
             @* OVERZICHT: details van het geselecteerde delict *@
+    <div class="row">
+        <!-- LINKERKOLOM: delictdetails/bewerken delict -->
+        <div class="col-md-6">
             <div class="delict-card">
                 @if (selectedCrime is null)
                 {
@@ -173,6 +176,60 @@
                     </div>
                 }
             </div>
+        </div>
+
+                <!-- RECHTERKOLOM: SOCIAL MEDIA -->
+    <div class="col-md-6">
+        <div class="delict-card" style="height:100%; max-height:350px; display:flex; flex-direction:column;">
+            <h6>Sociale media</h6>
+
+            <input class="form-control mb-2"
+                   placeholder="Trefwoorden (bijv. overlast, plein)"
+                   @bind="socialKeywords" />
+
+            <button class="btn btn-outline-primary mb-2"
+                    @onclick="LoadSocialMediaAsync"
+                    disabled="@isLoadingSocial">
+                @(isLoadingSocial ? "Laden..." : "Berichten ophalen")
+            </button>
+
+            <div style="overflow-y:auto; flex:1;">
+                @if (isLoadingSocial)
+                {
+                    <p class="text-muted">Berichten laden…</p>
+                }
+                else if (!string.IsNullOrWhiteSpace(socialError))
+                {
+                    <p class="text-danger">@socialError</p>
+                }
+                else if (socialPosts is null)
+                {
+                    <p class="text-muted">Nog geen berichten opgehaald</p>
+                }
+                else if (!socialPosts.Any())
+                {
+                    <p class="text-muted">Geen berichten gevonden</p>
+                }
+                else
+                {
+                    <ul class="list-unstyled">
+                        @foreach (var post in socialPosts)
+                        {
+                            <li class="mb-2 p-2 border rounded">
+                                <small class="text-muted">
+                                    @post.Platform · @post.PostedAt.ToString("HH:mm")
+                                </small>
+                                <p class="mb-0">@post.Content</p>
+                            </li>
+                        }   
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+     </div>
+
+
         }
         else
         {
@@ -269,6 +326,18 @@
     private bool _mapInitialized = false;
     private bool _needsMarkerRefresh = false;
 
+    // ============================================
+    // STATE: SOCIAL MEDIA (UC4)
+    // ============================================
+    [Inject]
+    private ISocialMediaService SocialMediaService { get; set; } = default!;
+
+    private string socialKeywords = "";
+    private IReadOnlyList<SocialMediaPost>? socialPosts;
+    private bool isLoadingSocial = false;
+    private string? socialError;
+
+
     /// <summary>
     /// Wordt aangeroepen wanneer de pagina wordt geïnitialiseerd.
     /// Haalt alle delicten op en past de filters toe.
@@ -293,6 +362,39 @@
 
         ApplyFilters();
     }
+
+    /// <summary>
+    /// Laadt berichten van social media voor het geselecteerde delict.
+    /// Gebruikt de opgegeven trefwoorden.
+    /// </summary>
+
+    private async Task LoadSocialMediaAsync()
+{
+    if (selectedCrime is null)
+        return;
+
+    isLoadingSocial = true;
+    socialError = null;
+    socialPosts = null;
+
+    try
+    {
+        var keywords = socialKeywords
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        socialPosts = await SocialMediaService.GetPostsForIncidentAsync(
+            selectedCrime.IncidentDateTime,
+            keywords);
+    }
+    catch (Exception ex)
+    {
+        socialError = ex.Message;
+    }
+    finally
+    {
+        isLoadingSocial = false;
+    }
+}
 
     /// <summary>
     /// Filtert allCrimes op basis van datum, type en stad.

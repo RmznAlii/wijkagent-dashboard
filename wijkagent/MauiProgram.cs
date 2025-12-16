@@ -34,6 +34,13 @@ public static class MauiProgram
         builder.Services.AddDbContext<WijkAgentDbContext>(options =>
             options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
+        using (var scope = builder.Services.BuildServiceProvider().CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<WijkAgentDbContext>();
+            db.Database.EnsureCreated();
+        }
+
+
         // Services
         builder.Services.AddScoped<ICrimeService, CrimeService>();
 
