@@ -1,12 +1,13 @@
 @page "/statistics"
 @using WijkAgent.Core.Models
 @using WijkAgent.Core.Services
+@using System.Threading
 @inject ICrimeService CrimeService
 
 <h3 class="mb-3">Criminaliteit statistieken</h3>
 
 <div class="row mb-3">
-    <!-- KPI cards -->
+    <!-- kaarten boven -->
     <div class="col-md-4">
         <div class="stat-card">
             <div class="stat-card-title">Totale aantal delicten</div>
@@ -51,7 +52,7 @@
         </div>
     </div>
 
-    <!-- Right: small statistic panels -->
+    <!-- tijden rechts -->
     <div class="col-md-4">
         <div class="stat-panel mb-3">
             <div class="stat-panel-title">Delicten per tijdstip</div>
@@ -151,79 +152,124 @@
     private string mostCommonType = "—";
     private int mostCommonCount = 0;
 
-    private int totalDelta = 0; // placeholder: delta vs previous period (percent)
+    private int totalDelta = 0;
     private int monthDelta = 0;
 
     private List<(string Label, int Count, int Percent)> timeSlots = new();
     private List<(string Type, int Count, int Percent)> types = new();
 
+    // Polling
+    private PeriodicTimer? _timer;
+    private CancellationTokenSource? _cts;
+    private Task? _pollingTask;
+
     protected override async Task OnInitializedAsync()
     {
-        var all = await CrimeService.GetAllAsync();
+        await RefreshStatsAsync();
 
-        totalCrimes = all?.Count ?? 0;
+        // Start polling every 10 seconds
+        _cts = new CancellationTokenSource();
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+        _pollingTask = PollLoopAsync(_cts.Token);
+    }
 
-        var now = DateTime.Now;
-        var firstOfMonth = new DateTime(now.Year, now.Month, 1);
-        thisMonthCount = all.Count(c => c.IncidentDateTime >= firstOfMonth && c.IncidentDateTime <= now);
-
-        // maanden vergelijken
-        var prevMonthStart = firstOfMonth.AddMonths(-1);
-        var prevMonthEnd = firstOfMonth.AddTicks(-1);
-        var prevMonthCount = all.Count(c => c.IncidentDateTime >= prevMonthStart && c.IncidentDateTime <= prevMonthEnd);
-
-        monthDelta = ComputePercentDelta(prevMonthCount, thisMonthCount);
-
-        // overall delta vs previous same-length period (simple example)
-        totalDelta = 0; // keep 0 for now (could implement custom logic)
-
-        // most common type
-        var byType = all.GroupBy(c => string.IsNullOrWhiteSpace(c.Type) ? "Onbekend" : c.Type)
-                        .Select(g => new { Type = g.Key, Count = g.Count() })
-                        .OrderByDescending(x => x.Count)
-                        .ToList();
-
-        if (byType.Any())
+    private async Task PollLoopAsync(CancellationToken ct)
+    {
+        try
         {
-            mostCommonType = byType.First().Type;
-            mostCommonCount = byType.First().Count;
-        }
-
-        var slots = new List<(string Label, int From, int To)> {
-            ("00:00-06:00", 0, 5),
-            ("06:00-12:00", 6, 11),
-            ("12:00-18:00", 12, 17),
-            ("18:00-00:00", 18, 23)
-        };
-
-        var totalForSlots = 0;
-        var slotCounts = new List<int>();
-        foreach (var s in slots)
-        {
-            var cnt = all.Count(c =>
+            while (await _timer!.WaitForNextTickAsync(ct))
             {
-                var h = c.IncidentDateTime.Hour;
-                return h >= s.From && h <= s.To;
-            });
-            slotCounts.Add(cnt);
-            totalForSlots += cnt;
+                // run the refresh on the Blazor sync context
+                await InvokeAsync(async () =>
+                {
+                    await RefreshStatsAsync();
+                    StateHasChanged();
+                });
+            }
         }
-
-        for (int i = 0; i < slots.Count; i++)
+        catch (OperationCanceledException)
         {
-            var cnt = slotCounts[i];
-            var pct = totalForSlots == 0 ? 0 : (int)Math.Round(100.0 * cnt / totalForSlots);
-            timeSlots.Add((slots[i].Label, cnt, pct));
+            // expected on dispose
         }
-
-        var totalTypes = byType.Sum(x => x.Count);
-        foreach (var t in byType.Take(6))
+        catch (Exception ex)
         {
-            var pct = totalTypes == 0 ? 0 : (int)Math.Round(100.0 * t.Count / totalTypes);
-            types.Add((t.Type, t.Count, pct));
+            Console.WriteLine($"Statistics polling error: {ex}");
         }
+    }
 
-        loading = false;
+    private async Task RefreshStatsAsync()
+    {
+        loading = true;
+
+        try
+        {
+            var all = await CrimeService.GetAllAsync();
+
+            totalCrimes = all?.Count ?? 0;
+
+            var now = DateTime.Now;
+            var firstOfMonth = new DateTime(now.Year, now.Month, 1);
+            thisMonthCount = all.Count(c => c.IncidentDateTime >= firstOfMonth && c.IncidentDateTime <= now);
+
+            var prevMonthStart = firstOfMonth.AddMonths(-1);
+            var prevMonthEnd = firstOfMonth.AddTicks(-1);
+            var prevMonthCount = all.Count(c => c.IncidentDateTime >= prevMonthStart && c.IncidentDateTime <= prevMonthEnd);
+
+            monthDelta = ComputePercentDelta(prevMonthCount, thisMonthCount);
+
+            totalDelta = 0;
+
+            var byType = all.GroupBy(c => string.IsNullOrWhiteSpace(c.Type) ? "Onbekend" : c.Type)
+                            .Select(g => new { Type = g.Key, Count = g.Count() })
+                            .OrderByDescending(x => x.Count)
+                            .ToList();
+
+            if (byType.Any())
+            {
+                mostCommonType = byType.First().Type;
+                mostCommonCount = byType.First().Count;
+            }
+
+            var slots = new List<(string Label, int From, int To)> {
+                ("00:00-06:00", 0, 5),
+                ("06:00-12:00", 6, 11),
+                ("12:00-18:00", 12, 17),
+                ("18:00-00:00", 18, 23)
+            };
+
+            var totalForSlots = 0;
+            var slotCounts = new List<int>();
+            foreach (var s in slots)
+            {
+                var cnt = all.Count(c =>
+                {
+                    var h = c.IncidentDateTime.Hour;
+                    return h >= s.From && h <= s.To;
+                });
+                slotCounts.Add(cnt);
+                totalForSlots += cnt;
+            }
+
+            timeSlots.Clear();
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var cnt = slotCounts[i];
+                var pct = totalForSlots == 0 ? 0 : (int)Math.Round(100.0 * cnt / totalForSlots);
+                timeSlots.Add((slots[i].Label, cnt, pct));
+            }
+
+            types.Clear();
+            var totalTypes = byType.Sum(x => x.Count);
+            foreach (var t in byType.Take(6))
+            {
+                var pct = totalTypes == 0 ? 0 : (int)Math.Round(100.0 * t.Count / totalTypes);
+                types.Add((t.Type, t.Count, pct));
+            }
+        }
+        finally
+        {
+            loading = false;
+        }
     }
 
     private static int ComputePercentDelta(int previous, int current)
@@ -243,4 +289,19 @@
 
     private static string GetDeltaClass(int delta) =>
         delta > 0 ? "negative" : (delta < 0 ? "positive" : "");
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            _cts?.Cancel();
+            if (_timer is not null) _timer.Dispose();
+            if (_pollingTask is not null) await _pollingTask;
+        }
+        catch (Exception) { /* ignore */ }
+        finally
+        {
+            _cts?.Dispose();
+        }
+    }
 }
