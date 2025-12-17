@@ -3,18 +3,29 @@ using WijkAgent.Core.Models;
 
 namespace WijkAgent.Tests;
 
+/// <summary>
+/// Fake implementatie van ICrimeService voor unit testing zonder database.
+/// Alle CRUD- en statistiekmethoden zijn in geheugen geïmplementeerd.
+/// </summary>
 public class FakeCrimeService : ICrimeService
 {
+    // Lijst die dient als "in-memory database"
     private readonly List<Crime> _crimes = new();
 
+    /// <summary>
+    /// Voegt een nieuw delict toe aan de in-memory lijst.
+    /// </summary>
     public Task<Crime> AddAsync(Crime crime)
     {
-        crime.Id = _crimes.Count + 1;
+        crime.Id = _crimes.Count + 1; // Automatisch ID toewijzen
         crime.CreatedAt = DateTime.Now;
         _crimes.Add(crime);
         return Task.FromResult(crime);
     }
 
+    /// <summary>
+    /// Verwijdert een delict op basis van ID. Retourneert true als succesvol.
+    /// </summary>
     public Task<bool> DeleteAsync(int id)
     {
         var crime = _crimes.FirstOrDefault(c => c.Id == id);
@@ -24,12 +35,24 @@ public class FakeCrimeService : ICrimeService
         return Task.FromResult(true);
     }
 
+    /// <summary>
+    /// Haalt alle delicten op.
+    /// </summary>
     public Task<List<Crime>> GetAllAsync() => Task.FromResult(_crimes.ToList());
 
+    /// <summary>
+    /// Haalt één delict op basis van ID.
+    /// </summary>
     public Task<Crime?> GetByIdAsync(int id) => Task.FromResult(_crimes.FirstOrDefault(c => c.Id == id));
 
+    /// <summary>
+    /// Haalt het meest recent aangemaakte delict op.
+    /// </summary>
     public Task<Crime?> GetNewestAsync() => Task.FromResult(_crimes.OrderByDescending(c => c.CreatedAt).FirstOrDefault());
 
+    /// <summary>
+    /// Filtert delicten op datum, type en stad.
+    /// </summary>
     public Task<List<Crime>> GetFilteredAsync(DateTime? from, DateTime? to, string? type, string? city)
     {
         var query = _crimes.AsQueryable();
@@ -42,6 +65,9 @@ public class FakeCrimeService : ICrimeService
         return Task.FromResult(query.ToList());
     }
 
+    /// <summary>
+    /// Update een bestaand delict. Retourneert null als het delict niet bestaat.
+    /// </summary>
     public Task<Crime?> UpdateAsync(Crime crime)
     {
         var existing = _crimes.FirstOrDefault(c => c.Id == crime.Id);
@@ -61,7 +87,10 @@ public class FakeCrimeService : ICrimeService
         return Task.FromResult(existing);
     }
 
+    // =========================
     // Statistiek-methoden
+    // =========================
+
     public Task<int> GetTotalCountAsync() => Task.FromResult(_crimes.Count);
 
     public Task<int> GetCountInRangeAsync(DateTime from, DateTime to)
@@ -98,7 +127,7 @@ public class FakeCrimeService : ICrimeService
     }
 
     public Task<List<(string Label, int Count)>> GetCountsByTimeSlotAsync()
-        => Task.FromResult(new List<(string Label, int Count)>());
+        => Task.FromResult(new List<(string Label, int Count)>()); // Dummy-implementatie
 
     public Task<List<(DateTime Date, int Count)>> GetCountsPerDayAsync(int days = 7)
     {

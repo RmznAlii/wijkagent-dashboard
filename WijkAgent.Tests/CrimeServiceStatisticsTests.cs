@@ -7,13 +7,19 @@ using Xunit;
 
 namespace WijkAgent.Tests;
 
+/// <summary>
+/// Unit tests voor statistiekfunctionaliteit van CrimeService.
+/// Testen met SQLite InMemory database.
+/// </summary>
 public class CrimeServiceStatisticsTests
 {
+    // Helper: maak DbContextOptions aan
     private DbContextOptions<WijkAgentDbContext> CreateOptions(SqliteConnection connection)
         => new DbContextOptionsBuilder<WijkAgentDbContext>()
             .UseSqlite(connection)
             .Options;
 
+    // Helper: seed testdata voor statistieken
     private async Task SeedDataAsync(WijkAgentDbContext context)
     {
         await context.Database.EnsureCreatedAsync();
@@ -35,7 +41,6 @@ public class CrimeServiceStatisticsTests
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
         await connection.OpenAsync();
-
         var options = CreateOptions(connection);
 
         await using (var ctx = new WijkAgentDbContext(options))
@@ -44,6 +49,8 @@ public class CrimeServiceStatisticsTests
             var service = new CrimeService(ctx);
 
             var total = await service.GetTotalCountAsync();
+
+            // Er moeten 4 delicten in totaal zijn
             Assert.Equal(4, total);
         }
     }
@@ -53,7 +60,6 @@ public class CrimeServiceStatisticsTests
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
         await connection.OpenAsync();
-
         var options = CreateOptions(connection);
 
         await using (var ctx = new WijkAgentDbContext(options))
@@ -62,6 +68,8 @@ public class CrimeServiceStatisticsTests
             var service = new CrimeService(ctx);
 
             var counts = await service.GetCountsByTypeAsync();
+
+            // Diefstal: 2, Overlast: 1
             Assert.Contains(counts, x => x.Type == "Diefstal" && x.Count == 2);
             Assert.Contains(counts, x => x.Type == "Overlast" && x.Count == 1);
         }
@@ -72,7 +80,6 @@ public class CrimeServiceStatisticsTests
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
         await connection.OpenAsync();
-
         var options = CreateOptions(connection);
 
         await using (var ctx = new WijkAgentDbContext(options))
@@ -81,6 +88,8 @@ public class CrimeServiceStatisticsTests
             var service = new CrimeService(ctx);
 
             var topCities = await service.GetTopCitiesAsync();
+
+            // Amsterdam heeft 2 delicten, Rotterdam 1
             Assert.Contains(topCities, x => x.City == "Amsterdam" && x.Count == 2);
             Assert.Contains(topCities, x => x.City == "Rotterdam" && x.Count == 1);
         }
@@ -91,7 +100,6 @@ public class CrimeServiceStatisticsTests
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
         await connection.OpenAsync();
-
         var options = CreateOptions(connection);
 
         await using (var ctx = new WijkAgentDbContext(options))
@@ -100,7 +108,9 @@ public class CrimeServiceStatisticsTests
             var service = new CrimeService(ctx);
 
             var perDay = await service.GetCountsPerDayAsync(7);
-            Assert.Contains(perDay, x => x.Count > 0); // Minimaal één entry
+
+            // Controleer dat er ten minste één dag met delicten is
+            Assert.Contains(perDay, x => x.Count > 0);
         }
     }
 }
