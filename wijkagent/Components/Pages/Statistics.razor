@@ -1,0 +1,246 @@
+@page "/statistics"
+@using WijkAgent.Core.Models
+@using WijkAgent.Core.Services
+@inject ICrimeService CrimeService
+
+<h3 class="mb-3">Criminaliteit statistieken</h3>
+
+<div class="row mb-3">
+    <!-- KPI cards -->
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-card-title">Totale aantal delicten</div>
+            <div class="stat-card-main">@totalCrimes.ToString("N0")</div>
+            <div class="stat-card-sub @GetDeltaClass(totalDelta)">
+                @GetDeltaText(totalDelta)
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-card-title">Deze maand</div>
+            <div class="stat-card-main">@thisMonthCount.ToString("N0")</div>
+            <div class="stat-card-sub @GetDeltaClass(monthDelta)">
+                @GetDeltaText(monthDelta)
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-card-title">Meest voorkomend</div>
+            <div class="stat-card-main">@mostCommonType</div>
+            <div class="stat-card-sub text-muted">@mostCommonCount melding(en)</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- placeholder -->
+    <div class="col-md-8">
+        <div class="big-panel">
+            @if (loading)
+            {
+                <div class="placeholder-text">Laden...</div>
+            }
+            else
+            {
+                <div class="placeholder-text"></div>
+            }
+        </div>
+    </div>
+
+    <!-- Right: small statistic panels -->
+    <div class="col-md-4">
+        <div class="stat-panel mb-3">
+            <div class="stat-panel-title">Delicten per tijdstip</div>
+            @foreach (var ts in timeSlots)
+            {
+                <div class="stat-row">
+                    <div class="stat-row-label">@ts.Label</div>
+                    <div class="stat-row-bar">
+                        <div class="bar-outer">
+                            <div class="bar-inner" style="width:@(ts.Percent)%"></div>
+                        </div>
+                        <div class="stat-row-value">@ts.Count (@ts.Percent%)</div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="stat-panel">
+            <div class="stat-panel-title">Delicten per type</div>
+            @foreach (var t in types)
+            {
+                <div class="stat-row">
+                    <div class="stat-row-label">@t.Type</div>
+                    <div class="stat-row-bar">
+                        <div class="bar-outer">
+                            <div class="bar-inner" style="width:@(t.Percent)%"></div>
+                        </div>
+                        <div class="stat-row-value">@t.Count (@t.Percent%)</div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .stat-card {
+        background: #fff;
+        border-radius: 8px;
+        padding: 18px;
+        box-shadow: 0 1px 3px rgba(0,0,0,.08);
+        border: 1px solid #e6e6e6;
+    }
+    .stat-card-title { font-weight:600; color:#333; }
+    .stat-card-main { font-size:28px; margin-top:8px; margin-bottom:6px; color:#111; }
+    .stat-card-sub { font-size:12px; }
+    .stat-card-sub.positive { color: #1a9d3a; }
+    .stat-card-sub.negative { color: #d6333a; }
+
+    .big-panel {
+        background: #fff;
+        border-radius: 8px;
+        height: 480px;
+        border: 1px solid #e6e6e6;
+        box-shadow: 0 1px 3px rgba(0,0,0,.06);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+    }
+    .placeholder-text { color:#9a9a9a; font-size:18px; }
+
+    .stat-panel {
+        background: #fff;
+        border-radius: 8px;
+        padding: 14px;
+        border: 1px solid #e6e6e6;
+        box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .stat-panel + .stat-panel { margin-top: 12px; }
+
+    .stat-panel-title { font-weight:700; margin-bottom:12px; }
+
+    .stat-row { margin-bottom:12px; }
+    .stat-row-label { font-weight:600; margin-bottom:6px; color:#222; }
+    .stat-row-bar { display:flex; align-items:center; gap:10px; }
+    .bar-outer {
+        flex: 1;
+        height:10px;
+        background: #f3eefe;
+        border-radius:6px;
+        overflow:hidden;
+        position:relative;
+    }
+    .bar-inner {
+        height:100%;
+        background: linear-gradient(90deg,#5a2b83,#a98be6);
+        border-radius:6px;
+    }
+    .stat-row-value { white-space:nowrap; font-size:13px; color:#444; min-width:70px; text-align:right; }
+</style>
+
+@code {
+    private bool loading = true;
+
+    private int totalCrimes = 0;
+    private int thisMonthCount = 0;
+    private string mostCommonType = "—";
+    private int mostCommonCount = 0;
+
+    private int totalDelta = 0; // placeholder: delta vs previous period (percent)
+    private int monthDelta = 0;
+
+    private List<(string Label, int Count, int Percent)> timeSlots = new();
+    private List<(string Type, int Count, int Percent)> types = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var all = await CrimeService.GetAllAsync();
+
+        totalCrimes = all?.Count ?? 0;
+
+        var now = DateTime.Now;
+        var firstOfMonth = new DateTime(now.Year, now.Month, 1);
+        thisMonthCount = all.Count(c => c.IncidentDateTime >= firstOfMonth && c.IncidentDateTime <= now);
+
+        // maanden vergelijken
+        var prevMonthStart = firstOfMonth.AddMonths(-1);
+        var prevMonthEnd = firstOfMonth.AddTicks(-1);
+        var prevMonthCount = all.Count(c => c.IncidentDateTime >= prevMonthStart && c.IncidentDateTime <= prevMonthEnd);
+
+        monthDelta = ComputePercentDelta(prevMonthCount, thisMonthCount);
+
+        // overall delta vs previous same-length period (simple example)
+        totalDelta = 0; // keep 0 for now (could implement custom logic)
+
+        // most common type
+        var byType = all.GroupBy(c => string.IsNullOrWhiteSpace(c.Type) ? "Onbekend" : c.Type)
+                        .Select(g => new { Type = g.Key, Count = g.Count() })
+                        .OrderByDescending(x => x.Count)
+                        .ToList();
+
+        if (byType.Any())
+        {
+            mostCommonType = byType.First().Type;
+            mostCommonCount = byType.First().Count;
+        }
+
+        var slots = new List<(string Label, int From, int To)> {
+            ("00:00-06:00", 0, 5),
+            ("06:00-12:00", 6, 11),
+            ("12:00-18:00", 12, 17),
+            ("18:00-00:00", 18, 23)
+        };
+
+        var totalForSlots = 0;
+        var slotCounts = new List<int>();
+        foreach (var s in slots)
+        {
+            var cnt = all.Count(c =>
+            {
+                var h = c.IncidentDateTime.Hour;
+                return h >= s.From && h <= s.To;
+            });
+            slotCounts.Add(cnt);
+            totalForSlots += cnt;
+        }
+
+        for (int i = 0; i < slots.Count; i++)
+        {
+            var cnt = slotCounts[i];
+            var pct = totalForSlots == 0 ? 0 : (int)Math.Round(100.0 * cnt / totalForSlots);
+            timeSlots.Add((slots[i].Label, cnt, pct));
+        }
+
+        var totalTypes = byType.Sum(x => x.Count);
+        foreach (var t in byType.Take(6))
+        {
+            var pct = totalTypes == 0 ? 0 : (int)Math.Round(100.0 * t.Count / totalTypes);
+            types.Add((t.Type, t.Count, pct));
+        }
+
+        loading = false;
+    }
+
+    private static int ComputePercentDelta(int previous, int current)
+    {
+        if (previous == 0)
+        {
+            if (current == 0) return 0;
+            return 100;
+        }
+
+        var delta = (current - previous) * 100.0 / previous;
+        return (int)Math.Round(delta);
+    }
+
+    private static string GetDeltaText(int delta) =>
+        delta == 0 ? "0% verandering" : (delta > 0 ? $"+{delta}% meer" : $"{Math.Abs(delta)}% minder");
+
+    private static string GetDeltaClass(int delta) =>
+        delta > 0 ? "negative" : (delta < 0 ? "positive" : "");
+}
