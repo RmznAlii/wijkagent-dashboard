@@ -73,5 +73,15 @@ namespace WijkAgent.Core.Services
             DateTime? to,
             string? type,
             string? city);
+
+        // Aggregates / optimized queries for statistics (added)
+        Task<int> GetTotalCountAsync();
+        Task<int> GetCountInRangeAsync(DateTime from, DateTime to);
+        Task<(int CurrentMonth, int PreviousMonth)> GetThisAndPreviousMonthCountsAsync();
+        Task<List<(string Type, int Count)>> GetCountsByTypeAsync(int top = 6);
+        Task<List<(string City, int Count)>> GetTopCitiesAsync(int top = 5);
+        Task<List<(string Label, int Count)>> GetCountsByTimeSlotAsync();
+        Task<List<(DateTime Date, int Count)>> GetCountsPerDayAsync(int days = 7);
+        Task<Crime?> GetNewestAsync();
     }
 }

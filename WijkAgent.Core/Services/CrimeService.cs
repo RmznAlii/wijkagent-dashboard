@@ -154,5 +154,142 @@ namespace WijkAgent.Core.Services
                 .OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
         }
+
+        // --- New aggregate methods ---
+
+        /// <summary>
+        /// Haalt het totale aantal delicten op.
+        /// </summary>
+        /// <returns>Totaal aantal <see cref="Crime"/> records.</returns>
+        public async Task<int> GetTotalCountAsync()
+        {
+            return await _db.Crimes.CountAsync();
+        }
+
+        /// <summary>
+        /// Haalt het aantal delicten op binnen een bepaalde datum- en tijdsperiode.
+        /// </summary>
+        /// <param name="from">Begin van de periode.</param>
+        /// <param name="to">Einde van de periode.</param>
+        /// <returns>Aantal delicten binnen de opgegeven periode.</returns>
+        public async Task<int> GetCountInRangeAsync(DateTime from, DateTime to)
+        {
+            return await _db.Crimes
+                .Where(c => c.IncidentDateTime >= from && c.IncidentDateTime <= to)
+                .CountAsync();
+        }
+
+        /// <summary>
+        /// Haalt het aantal delicten op voor de huidige maand en de vorige maand.
+        /// </summary>
+        /// <returns>Een tuple met het aantal delicten voor deze maand en de vorige maand.</returns>
+        public async Task<(int CurrentMonth, int PreviousMonth)> GetThisAndPreviousMonthCountsAsync()
+        {
+            var now = DateTime.Now;
+            var firstOfMonth = new DateTime(now.Year, now.Month, 1);
+            var prevStart = firstOfMonth.AddMonths(-1);
+            var prevEnd = firstOfMonth.AddTicks(-1);
+
+            var current = await _db.Crimes.CountAsync(c => c.IncidentDateTime >= firstOfMonth && c.IncidentDateTime <= now);
+            var previous = await _db.Crimes.CountAsync(c => c.IncidentDateTime >= prevStart && c.IncidentDateTime <= prevEnd);
+
+            return (current, previous);
+        }
+
+        /// <summary>
+        /// Haalt de top N meeste voorkomende type delicten op.
+        /// </summary>
+        /// <param name="top">Het aantal top type delicten dat opgehaald moet worden.</param>
+        /// <returns>Een lijst van tuples met type delict en bijbehorende aantal.</returns>
+        public async Task<List<(string Type, int Count)>> GetCountsByTypeAsync(int top = 6)
+        {
+            var q = await _db.Crimes
+                .GroupBy(c => string.IsNullOrWhiteSpace(c.Type) ? "Onbekend" : c.Type)
+                .Select(g => new { Type = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .Take(top)
+                .ToListAsync();
+
+            return q.Select(x => (x.Type, x.Count)).ToList();
+        }
+
+        /// <summary>
+        /// Haalt de top N steden op met het meeste aantal delicten.
+        /// </summary>
+        /// <param name="top">Het aantal top steden dat opgehaald moet worden.</param>
+        /// <returns>Een lijst van tuples met stad en bijbehorende aantal delicten.</returns>
+        public async Task<List<(string City, int Count)>> GetTopCitiesAsync(int top = 5)
+        {
+            var q = await _db.Crimes
+                .GroupBy(c => string.IsNullOrWhiteSpace(c.City) ? "Onbekend" : c.City)
+                .Select(g => new { City = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .Take(top)
+                .ToListAsync();
+
+            return q.Select(x => (x.City, x.Count)).ToList();
+        }
+
+        /// <summary>
+        /// Haalt het aantal delicten op verdeeld over vooraf gedefinieerde tijdslots.
+        /// Tijdslots:
+        /// - 00:00-06:00
+        /// - 06:00-12:00
+        /// - 12:00-18:00
+        /// - 18:00-00:00
+        /// </summary>
+        /// <returns>Een lijst van tuples met tijdslot label en bijbehorende aantal delicten.</returns>
+        public async Task<List<(string Label, int Count)>> GetCountsByTimeSlotAsync()
+        {
+            // 4 slots: 00:00-06:00, 06:00-12:00, 12:00-18:00, 18:00-00:00
+            var slot1 = await _db.Crimes.CountAsync(c => c.IncidentDateTime.Hour >= 0 && c.IncidentDateTime.Hour <= 5);
+            var slot2 = await _db.Crimes.CountAsync(c => c.IncidentDateTime.Hour >= 6 && c.IncidentDateTime.Hour <= 11);
+            var slot3 = await _db.Crimes.CountAsync(c => c.IncidentDateTime.Hour >= 12 && c.IncidentDateTime.Hour <= 17);
+            var slot4 = await _db.Crimes.CountAsync(c => c.IncidentDateTime.Hour >= 18 && c.IncidentDateTime.Hour <= 23);
+
+            return new List<(string, int)>
+            {
+                ("00:00-06:00", slot1),
+                ("06:00-12:00", slot2),
+                ("12:00-18:00", slot3),
+                ("18:00-00:00", slot4)
+            };
+        }
+
+        /// <summary>
+        /// Haalt het aantal delicten op per dag voor de afgelopen X dagen.
+        /// </summary>
+        /// <param name="days">Aantal dagen terug vanaf vandaag.</param>
+        /// <returns>Een lijst van tuples met datum en bijbehorende aantal delicten.</returns>
+        public async Task<List<(DateTime Date, int Count)>> GetCountsPerDayAsync(int days = 7)
+        {
+            var start = DateTime.Today.AddDays(-(days - 1));
+            var grouped = await _db.Crimes
+                .Where(c => c.IncidentDateTime >= start)
+                .GroupBy(c => new { c.IncidentDateTime.Year, c.IncidentDateTime.Month, c.IncidentDateTime.Day })
+                .Select(g => new { g.Key.Year, g.Key.Month, g.Key.Day, Count = g.Count() })
+                .ToListAsync();
+
+            var lookup = grouped.ToDictionary(x => new DateTime(x.Year, x.Month, x.Day), x => x.Count);
+
+            var result = new List<(DateTime Date, int Count)>();
+            for (int i = 0; i < days; i++)
+            {
+                var d = start.AddDays(i);
+                lookup.TryGetValue(d, out var cnt);
+                result.Add((d, cnt));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Haalt het meest recente delict op (op basis van aanmaaktijd).
+        /// </summary>
+        /// <returns>Het nieuwste <see cref="Crime"/> object, of null wanneer er geen delicten zijn.</returns>
+        public async Task<Crime?> GetNewestAsync()
+        {
+            return await _db.Crimes.OrderByDescending(c => c.CreatedAt).FirstOrDefaultAsync();
+        }
     }
 }

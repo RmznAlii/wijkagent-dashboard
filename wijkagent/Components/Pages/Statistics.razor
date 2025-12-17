@@ -1,0 +1,349 @@
+@page "/statistics"
+@using WijkAgent.Core.Models
+@using WijkAgent.Core.Services
+@inject ICrimeService CrimeService
+
+<h3 class="mb-3">Criminaliteit statistieken</h3>
+
+<div class="row mb-3">
+    <!-- kaarten boven -->
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-card-title">Totale aantal delicten</div>
+            <div class="stat-card-main">@totalCrimes.ToString("N0")</div>
+            <div class="stat-card-sub @GetDeltaClass(totalDelta)">
+                @GetDeltaText(totalDelta)
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-card-title">Deze maand</div>
+            <div class="stat-card-main">@thisMonthCount.ToString("N0")</div>
+            <div class="stat-card-sub @GetDeltaClass(monthDelta)">
+                @GetDeltaText(monthDelta)
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-card-title">Meest voorkomend</div>
+            <div class="stat-card-main">@mostCommonType</div>
+            <div class="stat-card-sub text-muted">@mostCommonCount melding(en)</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- uitgebreide statistieken links -->
+    <div class="col-md-8">
+        <div class="big-panel">
+            @if (loading)
+            {
+                <div class="placeholder-text">Laden...</div>
+            }
+            else
+            {
+                <div class="stats-inner">
+                    <div class="kpi-row">
+                        <div class="kpi">
+                            <div class="kpi-title">Laatste 24 uur</div>
+                            <div class="kpi-value">@last24hCount</div>
+                            <div class="kpi-sub text-muted">@last24hLabel</div>
+                        </div>
+
+                        <div class="kpi">
+                            <div class="kpi-title">Laatste 7 dagen</div>
+                            <div class="kpi-value">@last7DaysTotal</div>
+                            <div class="kpi-sub text-muted">Gemiddeld @avgPerDay.ToString("N1") / dag</div>
+                        </div>
+                    </div>
+
+                    <div class="trend-and-cities">
+                        <div class="top-cities-full">
+                            <div class="top-title">Top steden (meest meldingen)</div>
+                            @if (topCities.Any())
+                            {
+                                <ol class="top-list">
+                                    @foreach (var tc in topCities)
+                                    {
+                                        <li>@tc.City — @tc.Count</li>
+                                    }
+                                </ol>
+                            }
+                            else
+                            {
+                                <div class="text-muted">Geen data</div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- tijden rechts -->
+    <div class="col-md-4">
+        <div class="stat-panel mb-3">
+            <div class="stat-panel-title">Delicten per tijdstip</div>
+            @foreach (var ts in timeSlots)
+            {
+                <div class="stat-row">
+                    <div class="stat-row-label">@ts.Label</div>
+                    <div class="stat-row-bar">
+                        <div class="bar-outer">
+                            <div class="bar-inner" style="width:@(ts.Percent)%"></div>
+                        </div>
+                        <div class="stat-row-value">@ts.Count (@ts.Percent%)</div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="stat-panel">
+            <div class="stat-panel-title">Delicten per type</div>
+            @foreach (var t in types)
+            {
+                <div class="stat-row">
+                    <div class="stat-row-label">@t.Type</div>
+                    <div class="stat-row-bar">
+                        <div class="bar-outer">
+                            <div class="bar-inner" style="width:@(t.Percent)%"></div>
+                        </div>
+                        <div class="stat-row-value">@t.Count (@t.Percent%)</div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .stat-card {
+        background: #fff;
+        border-radius: 8px;
+        padding: 18px;
+        box-shadow: 0 1px 3px rgba(0,0,0,.08);
+        border: 1px solid #e6e6e6;
+    }
+    .stat-card-title { font-weight:600; color:#333; }
+    .stat-card-main { font-size:28px; margin-top:8px; margin-bottom:6px; color:#111; }
+    .stat-card-sub { font-size:12px; }
+    .stat-card-sub.positive { color: #1a9d3a; }
+    .stat-card-sub.negative { color: #d6333a; }
+
+    .big-panel {
+        background: #fff;
+        border-radius: 8px;
+        height: 480px;
+        border: 1px solid #e6e6e6;
+        box-shadow: 0 1px 3px rgba(0,0,0,.06);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding: 18px;
+    }
+    .placeholder-text { color:#9a9a9a; font-size:18px; }
+
+    .stats-inner { width:100%; }
+    .kpi-row { display:flex; gap:12px; margin-bottom:14px; }
+    .kpi { flex:1; background:#fafafa; padding:10px; border-radius:6px; border:1px solid #eee; text-align:left; }
+    .kpi-title { font-size:13px; color:#666; font-weight:600; }
+    .kpi-value { font-size:20px; font-weight:700; margin-top:6px; }
+    .kpi-sub { font-size:12px; color:#888; }
+
+    /* Removed sparkline; make top-cities use available space */
+    .trend-and-cities { display:flex; gap:14px; align-items:flex-start; }
+    .top-cities-full { width:100%; background:#fafafa; padding:12px; border-radius:6px; border:1px solid #eee; }
+    .top-title { font-weight:700; margin-bottom:8px; }
+    .top-list { margin:0; padding-left:18px; color:#333; }
+    .top-list li { margin-bottom:6px; font-size:14px; }
+
+    .stat-panel {
+        background: #fff;
+        border-radius: 8px;
+        padding: 14px;
+        border: 1px solid #e6e6e6;
+        box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .stat-panel + .stat-panel { margin-top: 12px; }
+
+    .stat-panel-title { font-weight:700; margin-bottom:12px; }
+
+    .stat-row { margin-bottom:12px; }
+    .stat-row-label { font-weight:600; margin-bottom:6px; color:#222; }
+    .stat-row-bar { display:flex; align-items:center; gap:10px; }
+    .bar-outer {
+        flex: 1;
+        height:10px;
+        background: #f3eefe;
+        border-radius:6px;
+        overflow:hidden;
+        position:relative;
+    }
+    .bar-inner {
+        height:100%;
+        background: linear-gradient(90deg,#5a2b83,#a98be6);
+        border-radius:6px;
+    }
+    .stat-row-value { white-space:nowrap; font-size:13px; color:#444; min-width:70px; text-align:right; }
+</style>
+
+@code {
+    private bool loading = true;
+
+    private int totalCrimes = 0;
+    private int thisMonthCount = 0;
+    private string mostCommonType = "—";
+    private int mostCommonCount = 0;
+
+    private int totalDelta = 0;
+    private int monthDelta = 0;
+
+    private List<(string Label, int Count, int Percent)> timeSlots = new();
+    private List<(string Type, int Count, int Percent)> types = new();
+
+    // Polling
+    private PeriodicTimer? _timer;
+    private CancellationTokenSource? _cts;
+    private Task? _pollingTask;
+
+    // Fields for left panel
+    private int last24hCount = 0;
+    private string last24hLabel = "";
+    private List<int> last7DaysCounts = new();
+    private List<string> last7DayLabels = new();
+    private int last7DaysTotal = 0;
+    private double avgPerDay = 0.0;
+    private List<(string City, int Count)> topCities = new();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshStatsAsync();
+
+        // Start polling every 10 seconds
+        _cts = new CancellationTokenSource();
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+        _pollingTask = PollLoopAsync(_cts.Token);
+    }
+
+    private async Task PollLoopAsync(CancellationToken ct)
+    {
+        try
+        {
+            while (await _timer!.WaitForNextTickAsync(ct))
+            {
+                // run the refresh on the Blazor sync context
+                await InvokeAsync(async () =>
+                {
+                    await RefreshStatsAsync();
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // expected on dispose
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Statistics polling error: {ex}");
+        }
+    }
+
+    private async Task RefreshStatsAsync()
+    {
+        loading = true;
+
+        try
+        {
+            // Use DB aggregates instead of loading full table
+            totalCrimes = await CrimeService.GetTotalCountAsync();
+
+            var (currentMonth, previousMonth) = await CrimeService.GetThisAndPreviousMonthCountsAsync();
+            thisMonthCount = currentMonth;
+            monthDelta = ComputePercentDelta(previousMonth, currentMonth);
+
+            // last 24h
+            var now = DateTime.Now;
+            last24hCount = await CrimeService.GetCountInRangeAsync(now.AddDays(-1), now);
+            last24hLabel = last24hCount == 0 ? "Geen meldingen" : (last24hCount == 1 ? "1 melding" : $"{last24hCount} meldingen");
+
+            // top types
+            var byType = await CrimeService.GetCountsByTypeAsync(6);
+            types.Clear();
+            var totalTypes = byType.Sum(x => x.Count);
+            foreach (var t in byType)
+            {
+                var pct = totalTypes == 0 ? 0 : (int)Math.Round(100.0 * t.Count / totalTypes);
+                types.Add((t.Type, t.Count, pct));
+            }
+
+            if (byType.Any())
+            {
+                mostCommonType = byType.First().Type;
+                mostCommonCount = byType.First().Count;
+            }
+
+            // time slots
+            var slots = await CrimeService.GetCountsByTimeSlotAsync();
+            timeSlots.Clear();
+            var totalForSlots = slots.Sum(s => s.Count);
+            foreach (var s in slots)
+            {
+                var pct = totalForSlots == 0 ? 0 : (int)Math.Round(100.0 * s.Count / totalForSlots);
+                timeSlots.Add((s.Label, s.Count, pct));
+            }
+
+            // last 7 days per day and averages
+            var days = await CrimeService.GetCountsPerDayAsync(7);
+            last7DaysCounts = days.Select(d => d.Count).ToList();
+            last7DayLabels = days.Select(d => d.Date.ToString("dd/MM")).ToList();
+            last7DaysTotal = last7DaysCounts.Sum();
+            avgPerDay = last7DaysCounts.Any() ? last7DaysCounts.Average() : 0.0;
+
+            // top cities
+            topCities = await CrimeService.GetTopCitiesAsync(5);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private static int ComputePercentDelta(int previous, int current)
+    {
+        if (previous == 0)
+        {
+            if (current == 0) return 0;
+            return 100;
+        }
+
+        var delta = (current - previous) * 100.0 / previous;
+        return (int)Math.Round(delta);
+    }
+
+    private static string GetDeltaText(int delta) =>
+        delta == 0 ? "0% verandering" : (delta > 0 ? $"+{delta}% meer" : $"{Math.Abs(delta)}% minder");
+
+    private static string GetDeltaClass(int delta) =>
+        delta > 0 ? "negative" : (delta < 0 ? "positive" : "");
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            _cts?.Cancel();
+            if (_timer is not null) _timer.Dispose();
+            if (_pollingTask is not null) await _pollingTask;
+        }
+        catch (Exception) { /* ignore */ }
+        finally
+        {
+            _cts?.Dispose();
+        }
+    }
+}
