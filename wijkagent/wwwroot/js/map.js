@@ -60,7 +60,6 @@ function getCrimeIcon(type) {
     return new markerIcon({ iconUrl: '/images/blue_marker.png' });
 }
 
-// Nieuw: addCrime ontvangt nu ook het Crime ID zodat marker-click het juiste delict kan selecteren in Blazor
 window.addCrime = (id, lat, lng, description, type) => {
     if (!window._crimeMap) return;
 
@@ -162,4 +161,54 @@ window.placePinByAddress = async (street, houseNumber, postcode, city, province,
         console.error(err);
         alert("Fout bij zoeken van adres.");
     }
+};
+
+// ===============================
+// UC6 - Crime Detail Map (single map)
+// ===============================
+window._crimeDetailMap = null;
+window._crimeDetailMarker = null;
+
+window.initCrimeDetailMap = (elementId) => {
+    const mapDiv = document.getElementById(elementId);
+    if (!mapDiv) return;
+
+    if (window._crimeDetailMap) {
+        window._crimeDetailMap.remove();
+        window._crimeDetailMap = null;
+        window._crimeDetailMarker = null;
+    }
+
+    window._crimeDetailMap = L.map(elementId).setView([52.1, 5.3], 7);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+    }).addTo(window._crimeDetailMap);
+
+    setTimeout(() => {
+        if (window._crimeDetailMap) window._crimeDetailMap.invalidateSize();
+    }, 200);
+};
+
+window.showSingleCrime = (lat, lng, description, type) => {
+    if (!window._crimeDetailMap) return;
+
+    const icon = getCrimeIcon(type);
+
+    window._crimeDetailMap.setView([lat, lng], 16);
+
+    if (window._crimeDetailMarker) {
+        window._crimeDetailMap.removeLayer(window._crimeDetailMarker);
+        window._crimeDetailMarker = null;
+    }
+
+    window._crimeDetailMarker = L.marker([lat, lng], { icon: icon })
+        .addTo(window._crimeDetailMap)
+        .bindPopup(`<b>${type}</b><br/>${description}`)
+        .openPopup();
+
+    setTimeout(() => {
+        if (window._crimeDetailMap) window._crimeDetailMap.invalidateSize();
+    }, 200);
 };
