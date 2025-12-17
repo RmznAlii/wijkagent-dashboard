@@ -1,7 +1,6 @@
 @page "/statistics"
 @using WijkAgent.Core.Models
 @using WijkAgent.Core.Services
-@using System.Threading
 @inject ICrimeService CrimeService
 
 <h3 class="mb-3">Criminaliteit statistieken</h3>
@@ -261,26 +260,27 @@
 
         try
         {
-            var all = await CrimeService.GetAllAsync();
+            // Use DB aggregates instead of loading full table
+            totalCrimes = await CrimeService.GetTotalCountAsync();
 
-            totalCrimes = all?.Count ?? 0;
+            var (currentMonth, previousMonth) = await CrimeService.GetThisAndPreviousMonthCountsAsync();
+            thisMonthCount = currentMonth;
+            monthDelta = ComputePercentDelta(previousMonth, currentMonth);
 
+            // last 24h
             var now = DateTime.Now;
-            var firstOfMonth = new DateTime(now.Year, now.Month, 1);
-            thisMonthCount = all.Count(c => c.IncidentDateTime >= firstOfMonth && c.IncidentDateTime <= now);
+            last24hCount = await CrimeService.GetCountInRangeAsync(now.AddDays(-1), now);
+            last24hLabel = last24hCount == 0 ? "Geen meldingen" : (last24hCount == 1 ? "1 melding" : $"{last24hCount} meldingen");
 
-            var prevMonthStart = firstOfMonth.AddMonths(-1);
-            var prevMonthEnd = firstOfMonth.AddTicks(-1);
-            var prevMonthCount = all.Count(c => c.IncidentDateTime >= prevMonthStart && c.IncidentDateTime <= prevMonthEnd);
-
-            monthDelta = ComputePercentDelta(prevMonthCount, thisMonthCount);
-
-            totalDelta = 0;
-
-            var byType = all.GroupBy(c => string.IsNullOrWhiteSpace(c.Type) ? "Onbekend" : c.Type)
-                            .Select(g => new { Type = g.Key, Count = g.Count() })
-                            .OrderByDescending(x => x.Count)
-                            .ToList();
+            // top types
+            var byType = await CrimeService.GetCountsByTypeAsync(6);
+            types.Clear();
+            var totalTypes = byType.Sum(x => x.Count);
+            foreach (var t in byType)
+            {
+                var pct = totalTypes == 0 ? 0 : (int)Math.Round(100.0 * t.Count / totalTypes);
+                types.Add((t.Type, t.Count, pct));
+            }
 
             if (byType.Any())
             {
@@ -288,71 +288,25 @@
                 mostCommonCount = byType.First().Count;
             }
 
-            var slots = new List<(string Label, int From, int To)> {
-                ("00:00-06:00", 0, 5),
-                ("06:00-12:00", 6, 11),
-                ("12:00-18:00", 12, 17),
-                ("18:00-00:00", 18, 23)
-            };
-
-            var totalForSlots = 0;
-            var slotCounts = new List<int>();
+            // time slots
+            var slots = await CrimeService.GetCountsByTimeSlotAsync();
+            timeSlots.Clear();
+            var totalForSlots = slots.Sum(s => s.Count);
             foreach (var s in slots)
             {
-                var cnt = all.Count(c =>
-                {
-                    var h = c.IncidentDateTime.Hour;
-                    return h >= s.From && h <= s.To;
-                });
-                slotCounts.Add(cnt);
-                totalForSlots += cnt;
+                var pct = totalForSlots == 0 ? 0 : (int)Math.Round(100.0 * s.Count / totalForSlots);
+                timeSlots.Add((s.Label, s.Count, pct));
             }
 
-            timeSlots.Clear();
-            for (int i = 0; i < slots.Count; i++)
-            {
-                var cnt = slotCounts[i];
-                var pct = totalForSlots == 0 ? 0 : (int)Math.Round(100.0 * cnt / totalForSlots);
-                timeSlots.Add((slots[i].Label, cnt, pct));
-            }
-
-            types.Clear();
-            var totalTypes = byType.Sum(x => x.Count);
-            foreach (var t in byType.Take(6))
-            {
-                var pct = totalTypes == 0 ? 0 : (int)Math.Round(100.0 * t.Count / totalTypes);
-                types.Add((t.Type, t.Count, pct));
-            }
-
-            // --- ADDITIONAL STATS ---
-            // last 24 hours
-            last24hCount = all.Count(c => c.IncidentDateTime >= now.AddDays(-1) && c.IncidentDateTime <= now);
-            last24hLabel = last24hCount == 0 ? "Geen meldingen" : (last24hCount == 1 ? "1 melding" : $"{last24hCount} meldingen");
-
-            // last 7 days (per day)
-            last7DaysCounts.Clear();
-            last7DayLabels.Clear();
-            last7DaysTotal = 0;
-            for (int d = 6; d >= 0; d--)
-            {
-                var day = now.Date.AddDays(-d);
-                var dayStart = day;
-                var dayEnd = day.AddDays(1).AddTicks(-1);
-                var cnt = all.Count(c => c.IncidentDateTime >= dayStart && c.IncidentDateTime <= dayEnd);
-                last7DaysCounts.Add(cnt);
-                last7DayLabels.Add(day.ToString("dd/MM"));
-                last7DaysTotal += cnt;
-            }
-
-            avgPerDay = last7DaysCounts.Count == 0 ? 0 : last7DaysCounts.Average();
+            // last 7 days per day and averages
+            var days = await CrimeService.GetCountsPerDayAsync(7);
+            last7DaysCounts = days.Select(d => d.Count).ToList();
+            last7DayLabels = days.Select(d => d.Date.ToString("dd/MM")).ToList();
+            last7DaysTotal = last7DaysCounts.Sum();
+            avgPerDay = last7DaysCounts.Any() ? last7DaysCounts.Average() : 0.0;
 
             // top cities
-            topCities = all
-                .GroupBy(c => string.IsNullOrWhiteSpace(c.City) ? "Onbekend" : c.City)
-                .Select(g => (City: g.Key, Count: g.Count()))
-                .OrderByDescending(x => x.Count)
-                .Take(5)
-                .ToList();
+            topCities = await CrimeService.GetTopCitiesAsync(5);
         }
         finally
         {
