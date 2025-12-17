@@ -83,6 +83,7 @@ namespace WijkAgent.Core.Services
             if (existing is null)
                 return null;
 
+            existing.Uid = crime.Uid;
             existing.Type = crime.Type;
             existing.Description = crime.Description;
             existing.Street = crime.Street;
