@@ -6,6 +6,8 @@
 @inject ICrimeService CrimeService
 @inject IJSRuntime JS
 @inject CrimeNotifier CrimeNotifier
+@inject NavigationManager Nav
+
 
 @implements IDisposable
 
@@ -169,6 +171,15 @@
 
                         <!-- Acties voor geselecteerd delict -->
                         <div style="display:flex; gap:10px; align-items:center;">
+
+                            <!-- UC6: Bekijken -->
+                            <button class="btn btn-outline-secondary"
+                                    disabled="@(selectedCrime is null)"
+                                    @onclick="GoToCrimeDetail">
+                                Bekijken
+                            </button>
+
+
                             <button class="delict-edit-btn"
                                     @onclick="async () => await StartEditCrime(selectedCrime.Id)">
                                 Bewerken
@@ -179,6 +190,7 @@
                                 Verwijderen
                             </button>
                         </div>
+
                     </div>
                 }
             </div>
@@ -650,4 +662,12 @@
         CrimeNotifier.CrimeAdded -= OnCrimeAdded;
         objRef?.Dispose();
     }
+    private void GoToCrimeDetail()
+    {
+        if (selectedCrime is null)
+            return;
+
+        Nav.NavigateTo("/crime/" + selectedCrime.Id);
+    }
+
 }
