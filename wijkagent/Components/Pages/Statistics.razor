@@ -38,7 +38,7 @@
 </div>
 
 <div class="row">
-    <!-- placeholder -->
+    <!-- uitgebreide statistieken links -->
     <div class="col-md-8">
         <div class="big-panel">
             @if (loading)
@@ -47,7 +47,40 @@
             }
             else
             {
-                <div class="placeholder-text"></div>
+                <div class="stats-inner">
+                    <div class="kpi-row">
+                        <div class="kpi">
+                            <div class="kpi-title">Laatste 24 uur</div>
+                            <div class="kpi-value">@last24hCount</div>
+                            <div class="kpi-sub text-muted">@last24hLabel</div>
+                        </div>
+
+                        <div class="kpi">
+                            <div class="kpi-title">Laatste 7 dagen</div>
+                            <div class="kpi-value">@last7DaysTotal</div>
+                            <div class="kpi-sub text-muted">Gemiddeld @avgPerDay.ToString("N1") / dag</div>
+                        </div>
+                    </div>
+
+                    <div class="trend-and-cities">
+                        <div class="top-cities-full">
+                            <div class="top-title">Top steden (meest meldingen)</div>
+                            @if (topCities.Any())
+                            {
+                                <ol class="top-list">
+                                    @foreach (var tc in topCities)
+                                    {
+                                        <li>@tc.City — @tc.Count</li>
+                                    }
+                                </ol>
+                            }
+                            else
+                            {
+                                <div class="text-muted">Geen data</div>
+                            }
+                        </div>
+                    </div>
+                </div>
             }
         </div>
     </div>
@@ -111,8 +144,23 @@
         display:flex;
         align-items:center;
         justify-content:center;
+        padding: 18px;
     }
     .placeholder-text { color:#9a9a9a; font-size:18px; }
+
+    .stats-inner { width:100%; }
+    .kpi-row { display:flex; gap:12px; margin-bottom:14px; }
+    .kpi { flex:1; background:#fafafa; padding:10px; border-radius:6px; border:1px solid #eee; text-align:left; }
+    .kpi-title { font-size:13px; color:#666; font-weight:600; }
+    .kpi-value { font-size:20px; font-weight:700; margin-top:6px; }
+    .kpi-sub { font-size:12px; color:#888; }
+
+    /* Removed sparkline; make top-cities use available space */
+    .trend-and-cities { display:flex; gap:14px; align-items:flex-start; }
+    .top-cities-full { width:100%; background:#fafafa; padding:12px; border-radius:6px; border:1px solid #eee; }
+    .top-title { font-weight:700; margin-bottom:8px; }
+    .top-list { margin:0; padding-left:18px; color:#333; }
+    .top-list li { margin-bottom:6px; font-size:14px; }
 
     .stat-panel {
         background: #fff;
@@ -162,6 +210,16 @@
     private PeriodicTimer? _timer;
     private CancellationTokenSource? _cts;
     private Task? _pollingTask;
+
+    // Fields for left panel
+    private int last24hCount = 0;
+    private string last24hLabel = "";
+    private List<int> last7DaysCounts = new();
+    private List<string> last7DayLabels = new();
+    private int last7DaysTotal = 0;
+    private double avgPerDay = 0.0;
+    private List<(string City, int Count)> topCities = new();
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -265,6 +323,36 @@
                 var pct = totalTypes == 0 ? 0 : (int)Math.Round(100.0 * t.Count / totalTypes);
                 types.Add((t.Type, t.Count, pct));
             }
+
+            // --- ADDITIONAL STATS ---
+            // last 24 hours
+            last24hCount = all.Count(c => c.IncidentDateTime >= now.AddDays(-1) && c.IncidentDateTime <= now);
+            last24hLabel = last24hCount == 0 ? "Geen meldingen" : (last24hCount == 1 ? "1 melding" : $"{last24hCount} meldingen");
+
+            // last 7 days (per day)
+            last7DaysCounts.Clear();
+            last7DayLabels.Clear();
+            last7DaysTotal = 0;
+            for (int d = 6; d >= 0; d--)
+            {
+                var day = now.Date.AddDays(-d);
+                var dayStart = day;
+                var dayEnd = day.AddDays(1).AddTicks(-1);
+                var cnt = all.Count(c => c.IncidentDateTime >= dayStart && c.IncidentDateTime <= dayEnd);
+                last7DaysCounts.Add(cnt);
+                last7DayLabels.Add(day.ToString("dd/MM"));
+                last7DaysTotal += cnt;
+            }
+
+            avgPerDay = last7DaysCounts.Count == 0 ? 0 : last7DaysCounts.Average();
+
+            // top cities
+            topCities = all
+                .GroupBy(c => string.IsNullOrWhiteSpace(c.City) ? "Onbekend" : c.City)
+                .Select(g => (City: g.Key, Count: g.Count()))
+                .OrderByDescending(x => x.Count)
+                .Take(5)
+                .ToList();
         }
         finally
         {
