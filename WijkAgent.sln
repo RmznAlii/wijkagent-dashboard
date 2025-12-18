@@ -1,5 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36414.22 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WijkAgent", "WijkAgent\WijkAgent.csproj", "{36C927E9-866A-4D6C-B5EA-3B97B6FD508E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WijkAgent.Core", "WijkAgent.Core\WijkAgent.Core.csproj", "{9A965D72-E4B1-4E35-9330-DF0284C896A4}"

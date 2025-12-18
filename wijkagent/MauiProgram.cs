@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using WijkAgent.Core.Data;
 using WijkAgent.Core.Services;
+using Microsoft.Extensions.Configuration;
+
 
 namespace WijkAgent;
 
@@ -12,6 +14,10 @@ public static class MauiProgram
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
+
+        var config = new ConfigurationBuilder()
+        .AddJsonFile("appsettings.json", optional: false)
+        .Build();
 
         builder
             .UseMauiApp<App>()
@@ -29,12 +35,35 @@ public static class MauiProgram
         var connectionString = "server=127.0.0.1;database=wijkagent;user=root;password=;";
         builder.Services.AddDbContext<WijkAgentDbContext>(options =>
             options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
-
+       
         // notifier singleton
         builder.Services.AddSingleton<CrimeNotifier>();
-
+        
         // Services
         builder.Services.AddScoped<ICrimeService, CrimeService>();
+
+
+        //builder.Services.AddScoped<ISocialMediaService, MockSocialMediaService>();
+
+        // X API service
+        builder.Services.AddSingleton<SocialMediaService>(sp =>
+        {
+            var httpClient = new HttpClient();
+            var token = config["XApi:BearerToken"];
+
+            return new SocialMediaService(httpClient, token);
+        });
+
+        // Mock service
+        builder.Services.AddSingleton<MockSocialMediaService>();
+
+        // Control (Dit bepaalt welke service de UI gebruikt)
+        builder.Services.AddSingleton<ISocialMediaService, SocialMediaControlService>();
+
+
+
+
+
 
         // HttpClient factory for API polling
         builder.Services.AddHttpClient();
@@ -56,6 +85,7 @@ public static class MauiProgram
 
             return new ApiPollService(httpFactory, db, crimeService, notifier, logger, apiUrl, pollInterval);
         });
+
 
         var app = builder.Build();
 
