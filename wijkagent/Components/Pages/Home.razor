@@ -202,7 +202,15 @@
                 <!-- RECHTERKOLOM: SOCIAL MEDIA -->
     <div class="col-md-6">
         <div class="delict-card" style="height:100%; max-height:350px; display:flex; flex-direction:column;">
-                        <span class="delict-title">Social media berichten</span>
+            <span class="delict-title">Social media berichten</span>
+
+            @if (selectedCrime is not null)
+                {
+                    <small class="text-muted">
+                     Tijdvenster rond
+                    @selectedCrime.IncidentDateTime.ToString("dd-MM-yyyy HH:mm")
+                     </small>
+                }
 
             <input class="form-control mb-2"
                    placeholder="Trefwoorden (bijv. overlast, plein)"
@@ -359,6 +367,17 @@
     private bool isLoadingSocial = false;
     private string? socialError;
 
+    /// <summary>
+    /// Ververst de social media berichten.
+    /// </summary>
+
+    private void ResetSocialMedia()
+    {
+        socialPosts = null;
+        socialError = null;
+        isLoadingSocial = false;
+        socialKeywords = "";
+    }
 
     /// <summary>
     /// Wordt aangeroepen wanneer de pagina wordt geïnitialiseerd.
@@ -404,7 +423,7 @@
         }
         else if (selectedCrime is null || !allCrimes.Any(c => c.Id == selectedCrime.Id))
         {
-            selectedCrime = allCrimes.First();
+            selectedCrime = allCrimes.First();            
         }
 
         ApplyFilters();
@@ -563,6 +582,8 @@
         selectedCrime = allCrimes?.FirstOrDefault(c => c.Id == crimeId)
                        ?? await CrimeService.GetByIdAsync(crimeId);
 
+        ResetSocialMedia();
+        socialKeywords = $"{selectedCrime.Type}, {selectedCrime.City}";
         StateHasChanged();
     }
 
