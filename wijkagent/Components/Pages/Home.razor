@@ -236,11 +236,11 @@
                     <ul class="list-unstyled">
                         @foreach (var post in socialPosts)
                         {
-                            <li class="mb-2 p-2 border rounded">
-                                <small class="text-muted">
-                                    @post.Platform · @post.PostedAt.ToString("HH:mm")
-                                </small>
-                                <p class="mb-0">@post.Content</p>
+                            <li style="margin-bottom:10px">
+                                <strong>@post.Platform · @post.Username</strong><br />
+                                <small>@post.PostedAt</small><br />
+                                @post.Content<br />
+                                <a href="@post.PostUrl" target="_blank">Bekijk op X</a>
                             </li>
                         }   
                     </ul>
