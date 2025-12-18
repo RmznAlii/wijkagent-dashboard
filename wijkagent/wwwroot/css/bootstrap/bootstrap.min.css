@@ -71,3 +71,9 @@ select.form-control{appearance:none}
 .border-radius-8{border-radius:8px}
 /* Utility */
 .text-center{text-align:center!important}
+@media (min-width: 768px) {
+    .col-md-6 {
+        flex: 0 0 auto;
+        width: 50%;
+    }
+}

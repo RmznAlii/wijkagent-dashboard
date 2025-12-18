@@ -116,7 +116,7 @@
    - Filters: filter op datum, type, stad
    ============================================ *@
 <div class="row mt-3">
-    <div class="col-md-8">
+    <div class="col-md-12">
 
         <!-- Tabs -->
         <div class="home-tabs">
@@ -202,7 +202,7 @@
                 <!-- RECHTERKOLOM: SOCIAL MEDIA -->
     <div class="col-md-6">
         <div class="delict-card" style="height:100%; max-height:350px; display:flex; flex-direction:column;">
-            <h6>Sociale media</h6>
+                        <span class="delict-title">Social media berichten</span>
 
             <input class="form-control mb-2"
                    placeholder="Trefwoorden (bijv. overlast, plein)"
@@ -236,11 +236,11 @@
                     <ul class="list-unstyled">
                         @foreach (var post in socialPosts)
                         {
-                            <li class="mb-2 p-2 border rounded">
-                                <small class="text-muted">
-                                    @post.Platform · @post.PostedAt.ToString("HH:mm")
-                                </small>
-                                <p class="mb-0">@post.Content</p>
+                            <li style="margin-bottom:10px">
+                                <strong>@post.Platform · @post.Username</strong><br />
+                                <small>@post.PostedAt</small><br />
+                                @post.Content<br />
+                                <a href="@post.PostUrl" target="_blank">Bekijk op X</a>
                             </li>
                         }   
                     </ul>
