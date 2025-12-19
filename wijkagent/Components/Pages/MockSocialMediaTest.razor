@@ -1,0 +1,70 @@
+﻿@page "/weather"
+@using WijkAgent.Core.Models
+@using WijkAgent.Core.Services
+@using System.IO
+
+@inject ISocialMediaService SocialMediaService
+
+<h3>Social Media API Test (X)</h3>
+
+<button @onclick="LoadPosts" disabled="@_isLoading">
+    @_isLoading ? "Laden..." : "Laad berichten"
+</button>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <p style="color:red"><strong>Fout:</strong> @_error</p>
+}
+else if (_posts == null)
+{
+    <p>Nog niets geladen</p>
+}
+else if (!_posts.Any())
+{
+    <p>Geen resultaten (API werkte, maar geen posts gevonden)</p>
+}
+else
+{
+    <ul>
+        @foreach (var post in _posts)
+        {
+            <li style="margin-bottom:10px">
+                <strong>@post.Username</strong><br />
+                <small>@post.PostedAt</small><br />
+                @post.Content<br />
+                <a href="@post.PostUrl" target="_blank">Bekijk op X</a>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private IReadOnlyList<SocialMediaPost>? _posts;
+    private bool _isLoading;
+    private string? _error;
+
+    private async Task LoadPosts()
+    {
+        _isLoading = true;
+        _error = null;
+        _posts = null;
+
+        try
+        {
+            var incidentTime = DateTime.Now;
+            var keywords = new[] { "steekpartij", "plein" };
+
+            _posts = await SocialMediaService.GetPostsForIncidentAsync(
+                incidentTime,
+                keywords);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

@@ -1,4 +1,6 @@
-namespace WijkAgent.Models
+using System;
+
+namespace WijkAgent.Core.Models
 {
     /// <summary>
     /// Modelklasse die één delict (Crime) vertegenwoordigt in de WijkAgent-applicatie.
@@ -14,6 +16,11 @@ namespace WijkAgent.Models
         public int Id { get; set; }
 
         /// <summary>
+        /// Externe unieke ID van de bron (bijv. uid van de API). Wordt gebruikt om duplicaten te voorkomen.
+        /// </summary>
+        public string? Uid { get; set; } = "";
+
+        /// <summary>
         /// Het type delict, bijvoorbeeld: "Diefstal", "Vandalisme", "Overlast".
         /// </summary>
         public string Type { get; set; } = "";
@@ -26,27 +33,27 @@ namespace WijkAgent.Models
         /// <summary>
         /// Straat waar het incident plaatsvond.
         /// </summary>
-        public string Street { get; set; } = "";
-
+        public string? Street { get; set; } = "";
+        
         /// <summary>
         /// Huisnummer van de locatie van het delict.
         /// </summary>
-        public string HouseNumber { get; set; } = "";
+        public string? HouseNumber { get; set; } = "";
 
         /// <summary>
         /// Postcode van het incident.
         /// </summary>
-        public string Postcode { get; set; } = "";
+        public string? Postcode { get; set; } = "";
 
         /// <summary>
         /// Stad waar het incident plaatsvond.
         /// </summary>
-        public string City { get; set; } = "";
+        public string? City { get; set; } = "";
 
         /// <summary>
         /// Provincie waarin het incident is geregistreerd.
         /// </summary>
-        public string Province { get; set; } = "";
+        public string? Province { get; set; } = "";
 
         /// <summary>
         /// De latitude-coördinaat (breedtegraad) van de exacte locatie van het delict.

@@ -63,14 +63,33 @@
     <ItemGroup>
         <PackageReference Include="ClosedXML" Version="0.105.0" />
         <PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
-        <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+        <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.8" />
         <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
     </ItemGroup>
 
     <ItemGroup>
-      <Content Include=".github\workflows\main.yml" />
+        <None Remove=".github/**" />
+        <MauiAsset Remove=".github/**" />
+        <Content Remove=".github/**" />
+        <BundleResource Remove=".github/**" />
+        <EmbeddedResource Remove=".github/**" />
     </ItemGroup>
+
+
+
+    <ItemGroup>
+      <ProjectReference Include="..\WijkAgent.Core\WijkAgent.Core.csproj" />
+    </ItemGroup>
+
+	<ItemGroup>
+		<None Update="appsettings.json">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
 
 </Project>

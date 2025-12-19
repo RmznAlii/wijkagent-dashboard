@@ -53,19 +53,28 @@ window.initCrimeMap = () => {
 };
 
 function getCrimeIcon(type) {
-    let markerIcon = L.Icon.extend({options: {iconSize: [37, 37], iconAnchor: [12, 37], popupAnchor: [1, -34]}});
-    if (type === "Diefstal") return new markerIcon({iconUrl: '/images/pink_marker.png'});
-    if (type === "Vandalisme") return new markerIcon({iconUrl: '/images/blue_marker.png'});
-    if (type === "Overlast") return new markerIcon({iconUrl: '/images/green_marker.png'});
-    return new markerIcon({iconUrl: '/images/blue_marker.png'});
+    let markerIcon = L.Icon.extend({ options: { iconSize: [37, 37], iconAnchor: [12, 37], popupAnchor: [1, -34] } });
+    if (type === "Diefstal") return new markerIcon({ iconUrl: '/images/pink_marker.png' });
+    if (type === "Vandalisme") return new markerIcon({ iconUrl: '/images/blue_marker.png' });
+    if (type === "Overlast") return new markerIcon({ iconUrl: '/images/green_marker.png' });
+    return new markerIcon({ iconUrl: '/images/blue_marker.png' });
 }
 
-window.addCrime = (lat, lng, description, type) => {
+window.addCrime = (id, lat, lng, description, type) => {
     if (!window._crimeMap) return;
+
     const icon = getCrimeIcon(type);
-    const marker = L.marker([lat, lng], {icon: icon})
+    const marker = L.marker([lat, lng], { icon: icon })
         .addTo(window._crimeMap)
         .bindPopup(`<b>${type}</b><br/>${description}`);
+
+    marker.on('click', () => {
+        if (window.dotnetHelper) {
+            window.dotnetHelper.invokeMethodAsync('MarkerClicked', id)
+                .catch(err => console.error(err));
+        }
+    });
+
     window._markers.push(marker);
 };
 
@@ -77,13 +86,24 @@ window.clearCrimes = () => {
 
 window.showCrimesFiltered = (crimeListJson) => {
     if (!window._crimeMap) return;
+
     window.clearCrimes();
     const crimes = JSON.parse(crimeListJson);
+
     crimes.forEach(crime => {
         const icon = getCrimeIcon(crime.Type);
-        const marker = L.marker([crime.Lat, crime.Lng], {icon: icon})
+
+        const marker = L.marker([crime.Lat, crime.Lng], { icon: icon })
             .addTo(window._crimeMap)
             .bindPopup(`<b>${crime.Type}</b><br/>${crime.Description}<br/>${crime.Street} ${crime.HouseNumber}, ${crime.Postcode} ${crime.City}`);
+
+        marker.on('click', () => {
+            if (window.dotnetHelper) {
+                window.dotnetHelper.invokeMethodAsync('MarkerClicked', crime.Id)
+                    .catch(err => console.error(err));
+            }
+        });
+
         window._markers.push(marker);
     });
 };
@@ -101,7 +121,7 @@ window.placePinByAddress = async (street, houseNumber, postcode, city, province,
     const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&q=${query}`;
 
     try {
-        const response = await fetch(url, {headers: {'User-Agent': 'wijkagent-app/1.0'}});
+        const response = await fetch(url, { headers: { 'User-Agent': 'wijkagent-app/1.0' } });
         const results = await response.json();
 
         if (results && results.length > 0) {
@@ -113,7 +133,7 @@ window.placePinByAddress = async (street, houseNumber, postcode, city, province,
 
             const icon = getCrimeIcon(type);
 
-            const tempMarker = L.marker([lat, lng], {icon: icon})
+            const tempMarker = L.marker([lat, lng], { icon: icon })
                 .addTo(window._crimeMap)
                 .bindPopup(`${street || ""} ${houseNumber || ""} <br/> ${postcode || ""} ${city || ""}`)
                 .openPopup();
@@ -123,8 +143,16 @@ window.placePinByAddress = async (street, houseNumber, postcode, city, province,
 
             const addr = r.address || {};
             if (window.dotnetHelper) {
-                window.dotnetHelper.invokeMethodAsync('MapClicked', lat, lng, addr.postcode || postcode, addr.city || city, addr.state || province, addr.road || street, addr.house_number || houseNumber)
-                    .catch(err => console.error(err));
+                window.dotnetHelper.invokeMethodAsync(
+                    'MapClicked',
+                    lat,
+                    lng,
+                    addr.postcode || postcode,
+                    addr.city || city,
+                    addr.state || province,
+                    addr.road || street,
+                    addr.house_number || houseNumber
+                ).catch(err => console.error(err));
             }
         } else {
             alert("Adres niet gevonden.");
@@ -133,4 +161,54 @@ window.placePinByAddress = async (street, houseNumber, postcode, city, province,
         console.error(err);
         alert("Fout bij zoeken van adres.");
     }
+};
+
+// ===============================
+// UC6 - Crime Detail Map (single map)
+// ===============================
+window._crimeDetailMap = null;
+window._crimeDetailMarker = null;
+
+window.initCrimeDetailMap = (elementId) => {
+    const mapDiv = document.getElementById(elementId);
+    if (!mapDiv) return;
+
+    if (window._crimeDetailMap) {
+        window._crimeDetailMap.remove();
+        window._crimeDetailMap = null;
+        window._crimeDetailMarker = null;
+    }
+
+    window._crimeDetailMap = L.map(elementId).setView([52.1, 5.3], 7);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+    }).addTo(window._crimeDetailMap);
+
+    setTimeout(() => {
+        if (window._crimeDetailMap) window._crimeDetailMap.invalidateSize();
+    }, 200);
+};
+
+window.showSingleCrime = (lat, lng, description, type) => {
+    if (!window._crimeDetailMap) return;
+
+    const icon = getCrimeIcon(type);
+
+    window._crimeDetailMap.setView([lat, lng], 16);
+
+    if (window._crimeDetailMarker) {
+        window._crimeDetailMap.removeLayer(window._crimeDetailMarker);
+        window._crimeDetailMarker = null;
+    }
+
+    window._crimeDetailMarker = L.marker([lat, lng], { icon: icon })
+        .addTo(window._crimeDetailMap)
+        .bindPopup(`<b>${type}</b><br/>${description}`)
+        .openPopup();
+
+    setTimeout(() => {
+        if (window._crimeDetailMap) window._crimeDetailMap.invalidateSize();
+    }, 200);
 };

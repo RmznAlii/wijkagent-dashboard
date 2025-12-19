@@ -1,9 +1,13 @@
 ﻿@page "/"
 
-@using WijkAgent.Models
-@using WijkAgent.Services
+@using WijkAgent.Core.Models
+@using WijkAgent.Core.Services
+@using System
 @inject ICrimeService CrimeService
 @inject IJSRuntime JS
+@inject CrimeNotifier CrimeNotifier
+@inject NavigationManager Nav
+
 
 @implements IDisposable
 
@@ -112,7 +116,7 @@
    - Filters: filter op datum, type, stad
    ============================================ *@
 <div class="row mt-3">
-    <div class="col-md-8">
+    <div class="col-md-12">
 
         <!-- Tabs -->
         <div class="home-tabs">
@@ -129,6 +133,9 @@
         @if (!showFilters)
         {
             @* OVERZICHT: details van het geselecteerde delict *@
+    <div class="row">
+        <!-- LINKERKOLOM: delictdetails/bewerken delict -->
+        <div class="col-md-6">
             <div class="delict-card">
                 @if (selectedCrime is null)
                 {
@@ -165,14 +172,93 @@
                             </p>
                         </div>
 
-                        <!-- Start bewerken van dit delict -->
-                        <button class="delict-edit-btn"
-                                @onclick="async () => await StartEditCrime(selectedCrime.Id)">
-                            Bewerken
-                        </button>
+                        <!-- Acties voor geselecteerd delict -->
+                        <div style="display:flex; gap:10px; align-items:center;">
+
+                            <!-- UC6: Bekijken -->
+                            <button class="btn btn-outline-secondary"
+                                    disabled="@(selectedCrime is null)"
+                                    @onclick="GoToCrimeDetail">
+                                Bekijken
+                            </button>
+
+
+                            <button class="delict-edit-btn"
+                                    @onclick="async () => await StartEditCrime(selectedCrime.Id)">
+                                Bewerken
+                            </button>
+
+                            <button class="btn btn-danger"
+                                    @onclick="DeleteSelectedCrime">
+                                Verwijderen
+                            </button>
+                        </div>
+
                     </div>
                 }
             </div>
+        </div>
+
+                <!-- RECHTERKOLOM: SOCIAL MEDIA -->
+    <div class="col-md-6">
+        <div class="delict-card" style="height:100%; max-height:350px; display:flex; flex-direction:column;">
+            <span class="delict-title">Social media berichten</span>
+
+            @if (selectedCrime is not null)
+                {
+                    <small class="text-muted">
+                     Tijdvenster rond
+                    @selectedCrime.IncidentDateTime.ToString("dd-MM-yyyy HH:mm")
+                     </small>
+                }
+
+            <input class="form-control mb-2"
+                   placeholder="Trefwoorden (bijv. overlast, plein)"
+                   @bind="socialKeywords" />
+
+            <button class="btn btn-outline-primary mb-2"
+                    @onclick="LoadSocialMediaAsync"
+                    disabled="@isLoadingSocial">
+                @(isLoadingSocial ? "Laden..." : "Berichten ophalen")
+            </button>
+
+            <div style="overflow-y:auto; flex:1;">
+                @if (isLoadingSocial)
+                {
+                    <p class="text-muted">Berichten laden…</p>
+                }
+                else if (!string.IsNullOrWhiteSpace(socialError))
+                {
+                    <p class="text-danger">@socialError</p>
+                }
+                else if (socialPosts is null)
+                {
+                    <p class="text-muted">Nog geen berichten opgehaald</p>
+                }
+                else if (!socialPosts.Any())
+                {
+                    <p class="text-muted">Geen berichten gevonden</p>
+                }
+                else
+                {
+                    <ul class="list-unstyled">
+                        @foreach (var post in socialPosts)
+                        {
+                            <li style="margin-bottom:10px">
+                                <strong>@post.Platform · @post.Username</strong><br />
+                                <small>@post.PostedAt</small><br />
+                                @post.Content<br />
+                                <a href="@post.PostUrl" target="_blank">Bekijk op X</a>
+                            </li>
+                        }   
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+     </div>
+
+
         }
         else
         {
@@ -225,6 +311,7 @@
         }
     </div>
 </div>
+
 @code {
     // ============================================
     // STATE: FORM-VELDEN VOOR DELICT
@@ -269,13 +356,56 @@
     private bool _mapInitialized = false;
     private bool _needsMarkerRefresh = false;
 
+    // ============================================
+    // STATE: SOCIAL MEDIA (UC4)
+    // ============================================
+    [Inject]
+    private ISocialMediaService SocialMediaService { get; set; } = default!;
+
+    private string socialKeywords = "";
+    private IReadOnlyList<SocialMediaPost>? socialPosts;
+    private bool isLoadingSocial = false;
+    private string? socialError;
+
+    /// <summary>
+    /// Ververst de social media berichten.
+    /// </summary>
+
+    private void ResetSocialMedia()
+    {
+        socialPosts = null;
+        socialError = null;
+        isLoadingSocial = false;
+        socialKeywords = "";
+    }
+
     /// <summary>
     /// Wordt aangeroepen wanneer de pagina wordt geïnitialiseerd.
     /// Haalt alle delicten op en past de filters toe.
     /// </summary>
     protected override async Task OnInitializedAsync()
     {
+        // subscribe to live notifications
+        CrimeNotifier.CrimeAdded += OnCrimeAdded;
+
         await LoadCrimes();
+    }
+
+    private void OnCrimeAdded(Crime c)
+    {
+        // marshal to Blazor UI thread
+        _ = InvokeAsync(() =>
+        {
+            allCrimes ??= new List<Crime>();
+            // insert newest at top (consistent with OrderByDescending CreatedAt)
+            allCrimes.Insert(0, c);
+
+            // Nieuw: na toevoegen automatisch het nieuwste delict selecteren (zoals gewenst)
+            selectedCrime = c;
+
+            ApplyFilters();
+            StateHasChanged();
+        });
     }
 
     /// <summary>
@@ -286,13 +416,51 @@
     {
         allCrimes = await CrimeService.GetAllAsync();
 
-        if (selectedCrime is null && allCrimes is { Count: > 0 })
+        // Nieuw: als het geselecteerde delict verwijderd is, of null is, pak dan automatisch de nieuwste
+        if (allCrimes is null || allCrimes.Count == 0)
         {
-            selectedCrime = allCrimes.First();
+            selectedCrime = null;
+        }
+        else if (selectedCrime is null || !allCrimes.Any(c => c.Id == selectedCrime.Id))
+        {
+            selectedCrime = allCrimes.First();            
         }
 
         ApplyFilters();
     }
+
+    /// <summary>
+    /// Laadt berichten van social media voor het geselecteerde delict.
+    /// Gebruikt de opgegeven trefwoorden.
+    /// </summary>
+
+    private async Task LoadSocialMediaAsync()
+{
+    if (selectedCrime is null)
+        return;
+
+    isLoadingSocial = true;
+    socialError = null;
+    socialPosts = null;
+
+    try
+    {
+        var keywords = socialKeywords
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        socialPosts = await SocialMediaService.GetPostsForIncidentAsync(
+            selectedCrime.IncidentDateTime,
+            keywords);
+    }
+    catch (Exception ex)
+    {
+        socialError = ex.Message;
+    }
+    finally
+    {
+        isLoadingSocial = false;
+    }
+}
 
     /// <summary>
     /// Filtert allCrimes op basis van datum, type en stad.
@@ -401,6 +569,25 @@
     }
 
     /// <summary>
+    /// Nieuw: Wordt door JavaScript aangeroepen wanneer de gebruiker op een marker klikt.
+    /// Hiermee kan de gebruiker zelf een delict selecteren dat in het overzicht wordt weergegeven.
+    /// </summary>
+    [JSInvokable]
+    public async Task MarkerClicked(int crimeId)
+    {
+        // Optioneel: bij marker-click altijd terug naar Overzicht-tab
+        showFilters = false;
+
+        // Probeer eerst uit de al geladen lijst (snel), anders fallback naar DB
+        selectedCrime = allCrimes?.FirstOrDefault(c => c.Id == crimeId)
+                       ?? await CrimeService.GetByIdAsync(crimeId);
+
+        ResetSocialMedia();
+        socialKeywords = $"{selectedCrime.Type}, {selectedCrime.City}";
+        StateHasChanged();
+    }
+
+    /// <summary>
     /// Roept een JS-functie aan om op basis van de ingevulde adresgegevens
     /// een marker op de kaart te plaatsen (geocoding aan JS-kant).
     /// </summary>
@@ -446,7 +633,8 @@
 
             result = await CrimeService.AddAsync(crime);
 
-            await JS.InvokeVoidAsync("addCrime", result.Lat, result.Lng, result.Description, result.Type);
+            // Nieuw: geef ook het ID mee zodat de marker klikbaar het juiste delict selecteert
+            await JS.InvokeVoidAsync("addCrime", result.Id, result.Lat, result.Lng, result.Description, result.Type);
 
             selectedCrime = result;
         }
@@ -482,6 +670,46 @@
 
         ResetForm();
         await LoadCrimes();
+    }
+
+    /// <summary>
+    /// Nieuw: Verwijdert het geselecteerde delict (na bevestiging) en refresht kaart + lijst.
+    /// </summary>
+    private async Task DeleteSelectedCrime()
+    {
+        if (selectedCrime is null)
+            return;
+
+        // Passende comment: extra safety zodat je niet per ongeluk data weggooit
+        var confirm = await JS.InvokeAsync<bool>("confirm",
+            $"Weet je zeker dat je delict #{selectedCrime.Id} wilt verwijderen?");
+
+        if (!confirm)
+            return;
+
+        var id = selectedCrime.Id;
+
+        // Als je nu dit delict aan het bewerken was: stop bewerken
+        if (isEditing && editingCrimeId == id)
+        {
+            isEditing = false;
+            editingCrimeId = null;
+            ResetForm();
+        }
+
+        var deleted = await CrimeService.DeleteAsync(id);
+
+        if (!deleted)
+        {
+            await JS.InvokeVoidAsync("alert", "Verwijderen is mislukt. Delict bestaat mogelijk niet meer.");
+            return;
+        }
+
+        // Zet selectie leeg; LoadCrimes kiest daarna automatisch de nieuwste (of null)
+        selectedCrime = null;
+
+        await LoadCrimes();
+        StateHasChanged();
     }
 
     /// <summary>
@@ -553,6 +781,16 @@
     /// </summary>
     public void Dispose()
     {
+        // unsubscribe to avoid memory leak
+        CrimeNotifier.CrimeAdded -= OnCrimeAdded;
         objRef?.Dispose();
     }
+    private void GoToCrimeDetail()
+    {
+        if (selectedCrime is null)
+            return;
+
+        Nav.NavigateTo("/crime/" + selectedCrime.Id);
+    }
+
 }
